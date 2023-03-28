@@ -29,7 +29,7 @@
           when: ansible_pkg_mgr == 'zypper'
 
     - name: Run diagnostics script
-      script: diagnostics.sh
+      script: ../incidents/scripts/diagnostics.sh
       register: diagnostics_result
 
     - name: Save diagnostics output to a file

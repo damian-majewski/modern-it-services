@@ -1,0 +1,41 @@
+---
+- hosts: all
+  become: true
+  vars_prompt:
+    - name: "new_user"
+      prompt: "Enter username"
+      private: no
+    - name: "new_user_password"
+      prompt: "Enter password"
+      private: yes
+    - name: "ssh_key"
+      prompt: "Enter public SSH key for new user"
+      private: no
+    - name: "gecos"
+      prompt: "Enter Description e.g. Company / Department"
+      private: no
+    
+  tasks:
+    - name: "Add new user account"
+      user:
+        name: "{{ new_user }}"
+        comment: "{{ gecos }}"
+        password: "{{ new_user_password | password_hash('sha512') }}"
+        groups: "sudo"
+        shell: "/bin/bash"
+        createhome: yes
+        home: "/home/{{ new_user }}"
+        state: present
+
+    - name: "Set SSH key for new user"
+      authorized_key:
+        user: "{{ new_user }}"
+        key: "{{ ssh_key }}"
+        state: present
+      
+    - name: "Add user to sudo group"
+      group:
+        name: "sudo"
+        state: present
+        members: "{{ new_user }}"
+        append: yes 
