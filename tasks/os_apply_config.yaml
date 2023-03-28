@@ -1,0 +1,19 @@
+
+---
+- name: OS apply changes in /etc
+  hosts: remote_servers
+  become: yes
+  tasks:
+
+    - name: Modify a configuration file
+      lineinfile:
+        path: /etc/some-config-file.conf
+        regexp: '^some_setting='
+        line: 'some_setting=new_value'
+      notify: Commit etckeeper changes
+  
+  
+  handlers:
+    - name: Commit etckeeper changes
+      command: etckeeper commit "Changes made by Ansible playbook"
+      changed_when: false

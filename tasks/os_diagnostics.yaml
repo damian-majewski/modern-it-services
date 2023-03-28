@@ -1,0 +1,38 @@
+---
+- name: Run advanced diagnostics
+  hosts: remote_servers
+  become: yes
+
+  tasks:
+    - name: Update package cache
+      ansible.builtin.package:
+        update_cache: yes
+      when: ansible_pkg_mgr == 'apt'
+
+    - name: Install needed packages
+      block:
+        - ansible.builtin.package:
+            name:
+              - htop
+              - iotop
+              - iftop
+          when: ansible_pkg_mgr == 'apt'
+
+        - ansible.builtin.package:
+            name:
+              - sysstat
+          when: ansible_pkg_mgr == 'yum' or ansible_pkg_mgr == 'dnf'
+
+        - ansible.builtin.package:
+            name:
+              - sysstat
+          when: ansible_pkg_mgr == 'zypper'
+
+    - name: Run diagnostics script
+      script: diagnostics.sh
+      register: diagnostics_result
+
+    - name: Save diagnostics output to a file
+      copy:
+        content: "{{ diagnostics_result.stdout }}"
+        dest: "/tmp/diagnostics_output.txt"

@@ -1,0 +1,49 @@
+---
+- name: Deploy code to remote server
+  hosts: remote_servers
+  become: yes
+
+  vars:
+    repo_url: https://github.com/user/repo.git
+    dest_dir: /var/www/app
+    backup_dir: /var/backups/app
+    uses_wordpress: yes  # Set this variable to 'yes' if the website uses WordPress
+
+  tasks:
+  - name: Ensure Git is installed
+    package:
+      name: git
+      state: present
+
+  - name: Create a backup directory
+    file:
+      path: "{{ backup_dir }}"
+      state: directory
+
+  - name: Create a backup of the current code
+    synchronize:
+      src: "{{ dest_dir }}"
+      dest: "{{ backup_dir }}"
+      archive: yes
+      delete: yes
+    delegate_to: localhost
+
+  - name: Clone the repository
+    git:
+      repo: "{{ repo_url }}"
+      dest: "{{ dest_dir }}"
+      update: yes
+      force: yes
+    register: git_result
+
+  - name: Restart Apache if the code was updated and Apache is installed
+    systemd:
+      name: apache2
+      state: restarted
+    when: git_result.changed and uses_wordpress == 'yes' and (ansible_facts.services['apache2.service'] is defined or ansible_facts.services['httpd.service'] is defined)
+
+  - name: Restart Nginx if the code was updated and Nginx is installed
+    systemd:
+      name: nginx
+      state: restarted
+    when: git_result.changed and uses_wordpress == 'yes' and ansible_facts.services['nginx.service'] is defined

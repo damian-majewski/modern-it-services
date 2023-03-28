@@ -1,0 +1,30 @@
+---
+- name: Install and configure etckeeper
+  hosts: all
+  become: yes
+
+  tasks:
+    - name: Install etckeeper and git
+      package:
+        name:
+          - etckeeper
+          - git
+        state: present
+
+    - name: Configure etckeeper to use Git
+      lineinfile:
+        path: /etc/etckeeper/etckeeper.conf
+        regexp: '^VCS=".*"$'
+        line: 'VCS="git"'
+      notify: initialize etckeeper
+
+  handlers:
+    - name: initialize etckeeper
+      command: etckeeper init
+      args:
+        creates: /etc/.git
+      register: etckeeper_init
+
+    - name: Commit initial state
+      command: etckeeper commit "Initial commit"
+      when: etckeeper_init.changed
