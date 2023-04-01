@@ -23,5 +23,11 @@ Each playbook includes the following sections:
 ## Contributing
 We welcome contributions to this repository from the community. If you have a playbook or script that you would like to contribute, please create a new pull request with your changes.
 
+## IT Company Behind Granatak Ecosystem
+
+Solveler (https://solveler.com) is the driving force behind the Granatak ecosystem. We are a modern IT company specializing in integrating the latest technologies, managing cloud infrastructure, and providing comprehensive training programs for IT teams.
+
+Feel free to contact us: office@solveler.com
+
 ## License
 This repository is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
