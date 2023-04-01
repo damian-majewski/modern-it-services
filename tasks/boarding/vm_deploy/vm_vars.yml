@@ -1,0 +1,11 @@
+---
+vm_name: "example-vm"
+datacenter: "DC1"
+cluster: "Cluster1"
+datastore: "datastore1"
+template: "ubuntu-20.04-template"
+folder: "/vm"
+resource_pool: "RP1"
+num_cpus: 2
+memory_mb: 2048
+network: "VM Network"

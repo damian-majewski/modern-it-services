@@ -1,0 +1,8 @@
+---
+instance_type: "t2.micro"
+key_name: "your-key-pair"
+subnet_id: "subnet-123456"
+security_group: "sg-123456"
+region: "us-west-2"
+ami_id: "ami-0c55b159cbfafe1f0" # Amazon Linux 2 LTS
+github_repo: "https://github.com/WordPress/WordPress.git"

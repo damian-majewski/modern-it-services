@@ -1,0 +1,11 @@
+---
+resource_group: "sap_app_resource_group"
+location: "eastus"
+virtual_network_name: "sap_app_vnet"
+subnet_name: "sap_app_subnet"
+nsg_name: "sap_app_nsg"
+vm_name: "sap_app_vm"
+vm_size: "Standard_D4s_v3"
+admin_username: "azureuser"
+ssh_public_key: "your-ssh-public-key"
+sap_hana_private_ip: "10.0.1.4" # Replace with your on-premises SAP HANA private IP

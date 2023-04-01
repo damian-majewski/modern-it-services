@@ -1,0 +1,68 @@
+---
+- name: Deploy SAP on Azure
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - sap_vars.yml
+  tasks:
+    - name: Set Azure access and secret keys from environment variables
+      set_fact:
+        azure_subscription_id: "{{ lookup('env', 'AZURE_SUBSCRIPTION_ID') }}"
+        azure_client_id: "{{ lookup('env', 'AZURE_CLIENT_ID') }}"
+        azure_secret: "{{ lookup('env', 'AZURE_SECRET') }}"
+        azure_tenant: "{{ lookup('env', 'AZURE_TENANT') }}"
+      no_log: true
+
+    - name: Deploy Azure resources
+      block:
+        - name: Create resource group
+          azure_rm_resourcegroup:
+            name: "{{ resource_group }}"
+            location: "{{ location }}"
+            subscription_id: "{{ azure_subscription_id }}"
+            client_id: "{{ azure_client_id }}"
+            secret: "{{ azure_secret }}"
+            tenant: "{{ azure_tenant }}"
+
+        - name: Create virtual machine
+          azure_rm_virtualmachine:
+            resource_group: "{{ resource_group }}"
+            name: "{{ vm_name }}"
+            vm_size: "{{ vm_size }}"
+            admin_username: "{{ admin_username }}"
+            ssh_password_enabled: false
+            ssh_public_keys:
+              - path: "/home/{{ admin_username }}/.ssh/authorized_keys"
+                key_data: "{{ ssh_public_key }}"
+            subscription_id: "{{ azure_subscription_id }}"
+            client_id: "{{ azure_client_id }}"
+            secret: "{{ azure_secret }}"
+            tenant: "{{ azure_tenant }}"
+            os_type: Linux
+            image:
+              offer: SLES-SAP
+              publisher: SUSE
+              sku: '12-sp5'
+              version: latest
+          register: sap_vm
+
+    - name: Add new instance to inventory
+      add_host:
+        name: "{{ sap_vm.ansible_host }}"
+        groups: "sap_hosts"
+
+- name: Deploy SAP application on Azure VM
+  hosts: sap_hosts
+  become: yes
+  gather_facts: yes
+  tasks:
+    - name: Install required packages for SAP
+      ansible.builtin.package:
+        name:
+          - compat-sap-c++-7
+          - sap-installation-wizard
+        state: latest
+
+    - name: Configure SAP application (placeholder task)
+      debug:
+        msg: "Configure your SAP application here"

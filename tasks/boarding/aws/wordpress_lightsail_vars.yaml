@@ -1,0 +1,6 @@
+---
+instance_type: "nano"
+key_name: "your-key-pair"
+region: "us-west-2"
+ami_id: "amazon_linux_2" # Amazon Linux 2 LTS
+github_repo: "https://github.com/WordPress/WordPress.git"

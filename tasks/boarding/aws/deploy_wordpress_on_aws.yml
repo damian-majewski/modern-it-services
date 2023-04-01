@@ -1,0 +1,89 @@
+---
+- name: Deploy WordPress on AWS
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - wordpress_vars.yml
+  tasks:
+    - name: Set AWS access and secret keys from environment variables
+      set_fact:
+        aws_access_key: "{{ lookup('env', 'AWS_ACCESS_KEY_ID') }}"
+        aws_secret_key: "{{ lookup('env', 'AWS_SECRET_ACCESS_KEY') }}"
+      no_log: true
+
+    - name: Deploy EC2 instance
+      block:
+        - name: Create security group
+          community.aws.ec2_group:
+            name: "{{ security_group }}"
+            description: "Allow HTTP and SSH"
+            region: "{{ region }}"
+            rules:
+              - proto: "tcp"
+                from_port: 22
+                to_port: 22
+                cidr_ip: "0.0.0.0/0"
+              - proto: "tcp"
+                from_port: 80
+                to_port: 80
+                cidr_ip: "0.0.0.0/0"
+            aws_access_key: "{{ aws_access_key }}"
+            aws_secret_key: "{{ aws_secret_key }}"
+          register: security_group_result
+
+        - name: Launch EC2 instance
+          community.aws.ec2:
+            key_name: "{{ key_name }}"
+            instance_type: "{{ instance_type }}"
+            image: "{{ ami_id }}"
+            wait: yes
+            group_id: "{{ security_group_result.group_id }}"
+            vpc_subnet_id: "{{ subnet_id }}"
+            region: "{{ region }}"
+            instance_tags:
+              Name: "wordpress-instance"
+            aws_access_key: "{{ aws_access_key }}"
+            aws_secret_key: "{{ aws_secret_key }}"
+          register: ec2_instances
+
+    - name: Add new instance to inventory
+      add_host:
+        name: "{{ item.public_ip }}"
+        groups: "wordpress_hosts"
+      loop: "{{ ec2_instances.instances }}"
+
+- name: Deploy WordPress on EC2 instances
+  hosts: wordpress_hosts
+  become: yes
+  gather_facts: yes
+  vars_files:
+    - wordpress_vars.yml
+  tasks:
+    - name: Install required packages
+      ansible.builtin.yum:
+        name:
+          - git
+          - httpd
+          - php
+          - php-mysqlnd
+        state: latest
+
+    - name: Start and enable Apache
+      ansible.builtin.systemd:
+        name: httpd
+        state: started
+        enabled: yes
+
+    - name: Clone WordPress repository
+      ansible.builtin.git:
+        repo: "{{ github_repo }}"
+        dest: /var/www/html
+
+    - name: Set permissions for WordPress directory
+      ansible.builtin.file:
+        path: /var/www/html
+        state: directory
+        mode: '0755'
+        owner: apache
+        group: apache
+        recurse: yes

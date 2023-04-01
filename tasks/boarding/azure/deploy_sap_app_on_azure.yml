@@ -1,0 +1,123 @@
+# You can now run the playbook using the following command:
+#
+#```sh
+# ansible-playbook deploy_sap_app_on_azure.yml --tags "azure_resources,sap_installation"
+#
+---
+- name: Deploy SAP Application on Azure
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - sap_app_vars.yml
+  tasks:
+    - name: Set Azure access and secret keys from environment variables
+      set_fact:
+        azure_subscription_id: "{{ lookup('env', 'AZURE_SUBSCRIPTION_ID') }}"
+        azure_client_id: "{{ lookup('env', 'AZURE_CLIENT_ID') }}"
+        azure_secret: "{{ lookup('env', 'AZURE_SECRET') }}"
+        azure_tenant: "{{ lookup('env', 'AZURE_TENANT') }}"
+      no_log: true
+
+    - name: Deploy Azure resources
+      block:
+        - name: Create resource group
+          azure_rm_resourcegroup:
+            name: "{{ resource_group }}"
+            location: "{{ location }}"
+            subscription_id: "{{ azure_subscription_id }}"
+            client_id: "{{ azure_client_id }}"
+            secret: "{{ azure_secret }}"
+            tenant: "{{ azure_tenant }}"
+
+        - name: Create virtual network
+          azure_rm_virtualnetwork:
+            resource_group: "{{ resource_group }}"
+            name: "{{ virtual_network_name }}"
+            address_prefixes: "10.0.0.0/16"
+            location: "{{ location }}"
+            subscription_id: "{{ azure_subscription_id }}"
+            client_id: "{{ azure_client_id }}"
+            secret: "{{ azure_secret }}"
+            tenant: "{{ azure_tenant }}"
+
+        - name: Create subnet
+          azure_rm_subnet:
+            resource_group: "{{ resource_group }}"
+            name: "{{ subnet_name }}"
+            virtual_network_name: "{{ virtual_network_name }}"
+            address_prefix: "10.0.0.0/24"
+            subscription_id: "{{ azure_subscription_id }}"
+            client_id: "{{ azure_client_id }}"
+            secret: "{{ azure_secret }}"
+            tenant: "{{ azure_tenant }}"
+
+        - name: Create network security group
+          azure_rm_securitygroup:
+            resource_group: "{{ resource_group }}"
+            name: "{{ nsg_name }}"
+            location: "{{ location }}"
+            rules:
+              - name: 'SSH'
+                protocol: 'Tcp'
+                destination_port_range: 22
+                access: 'Allow'
+                priority: 100
+                direction: 'Inbound'
+              - name: 'SAP_Application_Ports'
+                protocol: 'Tcp'
+                destination_port_range: '3200-3299'
+                access: 'Allow'
+                priority: 200
+                direction: 'Inbound'
+            subscription_id: "{{ azure_subscription_id }}"
+            client_id: "{{ azure_client_id }}"
+            secret: "{{ azure_secret }}"
+            tenant: "{{ azure_tenant }}"
+
+    - name: Create virtual machine for SAP application
+      azure_rm_virtualmachine:
+        resource_group: "{{ resource_group }}"
+        name: "{{ vm_name }}"
+        vm_size: "{{ vm_size }}"
+        admin_username: "{{ admin_username }}"
+        ssh_password_enabled: false
+        ssh_public_keys:
+          - path: "/home/{{ admin_username }}/.ssh/authorized_keys"
+            key_data: "{{ ssh_public_key }}"
+        network_interfaces: "{{ vm_name }}_nic"
+        image:
+          offer: "SLES-SAP"
+          publisher: "SUSE"
+          sku: "12-sp5"
+          version: "latest"
+        location: "{{ location }}"
+        subscription_id: "{{ azure_subscription_id }}"
+        client_id: "{{ azure_client_id }}"
+        secret: "{{ azure_secret }}"
+        tenant: "{{ azure_tenant }}"
+
+  tags: ['azure_resources']
+
+- name: Install and configure SAP application
+  block:
+    - name: Install required packages
+      ansible.builtin.package:
+        name:
+          - "sap-installation-wizard"
+          - "saplocales"
+        state: present
+
+    - name: Configure SAP application
+      ansible.builtin.template:
+        src: sap_app.ini.j2
+        dest: /tmp/sap_app.ini
+      vars:
+        sap_hana_private_ip: "{{ sap_hana_private_ip }}"
+
+    - name: Install SAP application using the installation wizard
+      ansible.builtin.command:
+        cmd: sapinst SAPINST_INPUT_PARAMETERS_URL=/tmp/sap_app.ini
+      args:
+        creates: /usr/sap/{{ sap_system_id }}/SYS
+
+  tags: ['sap_installation']

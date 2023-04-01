@@ -1,0 +1,13 @@
+---
+instance_type: "t2.micro"
+key_name: "your_key_pair_name"
+subnet_id: "subnet-12345"
+ami_id_mapping:
+  - name: "Amazon Linux 2"
+    ami_id: "ami-0c94855ba95b798c7"
+  - name: "Ubuntu 20.04"
+    ami_id: "ami-0c94855ba95c71c99"
+security_group: "sg-12345"
+region: "us-east-1"
+
+

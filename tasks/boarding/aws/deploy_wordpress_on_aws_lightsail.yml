@@ -1,0 +1,67 @@
+---
+- name: Deploy WordPress on AWS Lightsail
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - wordpress_lightsail_vars.yml
+  tasks:
+    - name: Set AWS access and secret keys from environment variables
+      set_fact:
+        aws_access_key: "{{ lookup('env', 'AWS_ACCESS_KEY_ID') }}"
+        aws_secret_key: "{{ lookup('env', 'AWS_SECRET_ACCESS_KEY') }}"
+      no_log: true
+
+    - name: Deploy Lightsail instance
+      block:
+        - name: Create Lightsail instance
+          community.aws.lightsail_instance:
+            state: present
+            region: "{{ region }}"
+            name: "wordpress-instance"
+            blueprint_id: "{{ ami_id }}"
+            bundle_id: "{{ instance_type }}"
+            key_pair_name: "{{ key_name }}"
+            aws_access_key: "{{ aws_access_key }}"
+            aws_secret_key: "{{ aws_secret_key }}"
+          register: lightsail_instance
+
+    - name: Add new instance to inventory
+      add_host:
+        name: "{{ lightsail_instance.instance.public_ip }}"
+        groups: "wordpress_hosts"
+
+- name: Deploy WordPress on Lightsail instances
+  hosts: wordpress_hosts
+  become: yes
+  gather_facts: yes
+  vars_files:
+    - wordpress_vars.yml
+  tasks:
+    - name: Install required packages
+      ansible.builtin.yum:
+        name:
+          - git
+          - httpd
+          - php
+          - php-mysqlnd
+        state: latest
+
+    - name: Start and enable Apache
+      ansible.builtin.systemd:
+        name: httpd
+        state: started
+        enabled: yes
+
+    - name: Clone WordPress repository
+      ansible.builtin.git:
+        repo: "{{ github_repo }}"
+        dest: /var/www/html
+
+    - name: Set permissions for WordPress directory
+      ansible.builtin.file:
+        path: /var/www/html
+        state: directory
+        mode: '0755'
+        owner: apache
+        group: apache
+        recurse: yes
