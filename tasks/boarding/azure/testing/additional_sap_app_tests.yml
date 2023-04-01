@@ -1,0 +1,38 @@
+# ansible-playbook -i sap_app_inventory.ini additional_sap_app_tests.yml
+---
+- name: Additional tests for SAP application on Azure
+  hosts: sap_app_servers
+  gather_facts: yes
+  tasks:
+    - name: Check system uptime
+      block:
+        - name: Get system uptime
+          ansible.builtin.shell:
+            cmd: cat /proc/uptime
+          register: uptime_result
+
+        - name: Display system uptime
+          ansible.builtin.debug:
+            var: uptime_result.stdout
+
+    - name: Check number of active connections
+      block:
+        - name: Count active connections
+          ansible.builtin.shell:
+            cmd: ss -t | grep ESTAB | wc -l
+          register: active_connections_result
+
+        - name: Display number of active connections
+          ansible.builtin.debug:
+            var: active_connections_result.stdout
+
+    - name: Check application-specific logs
+      block:
+        - name: Retrieve SAP application logs
+          ansible.builtin.shell:
+            cmd: tail -n 100 /var/log/sap_application.log
+          register: sap_app_logs
+
+        - name: Display SAP application logs
+          ansible.builtin.debug:
+            var: sap_app_logs.stdout_lines
