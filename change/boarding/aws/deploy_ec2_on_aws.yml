@@ -5,12 +5,35 @@
   gather_facts: false
   vars_files:
     - ec2_vars.yml
+  vars_prompt:
+    - name: "os_family"
+      prompt: "Enter the OS family (e.g., AmazonLinux2, Ubuntu, RHEL, SUSE):"
+      private: no
+    - name: "hypervisor"
+      prompt: "Enter the hypervisor (e.g., xen, kvm):"
+      private: no
+
   tasks:
     - name: Set AWS access and secret keys from environment variables
       set_fact:
         aws_access_key: "{{ lookup('env', 'AWS_ACCESS_KEY_ID') }}"
         aws_secret_key: "{{ lookup('env', 'AWS_SECRET_ACCESS_KEY') }}"
       no_log: true
+
+    - name: Get the latest AMI ID for the specified OS_family and hypervisor
+      community.aws.ec2_ami_info:
+        owners: "amazon"
+        filters:
+          architecture: "x86_64"
+          virtualization-type: "{{ hypervisor }}"
+          name: "{{ os_family }}*"
+          root-device-type: "ebs"
+          state: "available"
+      register: ami_info
+
+    - name: Set AMI ID variable
+      set_fact:
+        ami_id: "{{ ami_info.images | sort(attribute='creation_date', reverse=True) | first | json_query('image_id') }}"
 
     - name: Deploy EC2 instance
       block:
@@ -23,9 +46,7 @@
               - proto: "tcp"
                 from_port: 22
                 to_port: 22
-                cidr_ip: "0.0.0.0/0"
-            aws_access_key: "{{ aws_access_key }}"
-            aws_secret_key: "{{ aws_secret_key }}"
+                cidr_ip: "0.0.0.0/0"           
           register: security_group_result
 
         - name: Launch EC2 instance
@@ -38,9 +59,7 @@
             vpc_subnet_id: "{{ subnet_id }}"
             region: "{{ region }}"
             instance_tags:
-              Name: "example-ec2-instance"
-            aws_access_key: "{{ aws_access_key }}"
-            aws_secret_key: "{{ aws_secret_key }}"
+              Name: "example-ec2-instance"          
           register: ec2_instances
 
     - name: Display new EC2 instance info

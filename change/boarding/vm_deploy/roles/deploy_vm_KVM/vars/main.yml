@@ -1,0 +1,28 @@
+---
+# vSphere connection details
+vcenter_hostname: "vcenter.example.com"
+vcenter_username: "username"
+vcenter_password: "password"
+datacenter_name: "Datacenter"
+cluster_name: "Cluster"
+datastore_name: "Datastore"
+
+# VM details
+vm_name: "my_vm"
+vm_template: "template_name"
+vm_folder: "VM_folder"
+vm_resource_pool: "Resource_Pool"
+vm_datastore: "Datastore"
+vm_cpu: 2
+vm_memory: 2048
+vm_disk_size: 40
+vm_network: "VM Network"
+vm_guest_id: "rhel7_64Guest"
+
+# Guest OS customization details
+guest_os_hostname: "my_vm"
+guest_os_domain: "example.com"
+guest_os_time_zone: "UTC"
+guest_os_admin_password: "password"
+guest_os_auto_logon: true
+guest_os_auto_logon_count: 1

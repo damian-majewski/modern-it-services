@@ -27,8 +27,8 @@
                 from_port: 80
                 to_port: 80
                 cidr_ip: "0.0.0.0/0"
-            aws_access_key: "{{ aws_access_key }}"
-            aws_secret_key: "{{ aws_secret_key }}"
+            
+            
           register: security_group_result
 
         - name: Launch EC2 instance
@@ -42,8 +42,8 @@
             region: "{{ region }}"
             instance_tags:
               Name: "wordpress-instance"
-            aws_access_key: "{{ aws_access_key }}"
-            aws_secret_key: "{{ aws_secret_key }}"
+            
+            
           register: ec2_instances
 
     - name: Add new instance to inventory

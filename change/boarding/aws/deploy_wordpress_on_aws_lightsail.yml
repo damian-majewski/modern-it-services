@@ -21,8 +21,8 @@
             blueprint_id: "{{ ami_id }}"
             bundle_id: "{{ instance_type }}"
             key_pair_name: "{{ key_name }}"
-            aws_access_key: "{{ aws_access_key }}"
-            aws_secret_key: "{{ aws_secret_key }}"
+            
+            
           register: lightsail_instance
 
     - name: Add new instance to inventory

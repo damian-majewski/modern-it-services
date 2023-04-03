@@ -1,31 +1,64 @@
 ---
+- name: Install required packages for KVM
+  apt:
+    name:
+      - qemu-kvm
+      - libvirt-daemon
+      - libvirt-daemon-system
+      - virtinst
+      - libosinfo-bin
+    state: present
+  become: yes
+  when: ansible_os_family == 'Debian'
+
+- name: Install required packages for KVM (RedHat based)
+  yum:
+    name:
+      - qemu-kvm
+      - libvirt
+      - libvirt-python
+      - libguestfs-tools
+      - virt-install
+    state: present
+  become: yes
+  when: ansible_os_family == 'RedHat'
+
+- name: Start and enable libvirtd service
+  systemd:
+    name: libvirtd
+    state: started
+    enabled: yes
+  become: yes
+
 - name: Create VM on KVM
   virt:
     name: "{{ vm_name }}"
-    memory: "{{ memory_mb }}"
-    vcpus: "{{ num_cpus }}"
+    virt_type: kvm
     state: running
-    boot_dev: network
-    os_type: "{{ os_type }}"
-    os_variant: "{{ os_variant }}"
+    memory: "{{ vm_memory }}"
+    vcpus: "{{ vm_vcpus }}"
     disk:
-      - size: "{{ disk_size_gb }}"
+      - size: "{{ vm_disk_size }}"
         format: qcow2
-        pool: "{{ pool }}"
-    graphics: vnc
-    cloud_init:
-      hostname: "{{ vm_name }}"
-      users:
-        - name: "{{ user }}"
-          gecos: "{{ user }}"
-          groups: wheel
-          sudo: ALL=(ALL) NOPASSWD:ALL
-      disable_root: true
-    kernel: "{{ kernel }}"
-    initrd: "{{ initrd }}"
-    cmdline: "{{ cmdline }}"
-  register: vm_deploy_result
+        path: "/var/lib/libvirt/images/{{ vm_name }}.qcow2"
+    os_type: "{{ vm_os_type }}"
+    os_variant: "{{ vm_os_variant }}"
+    graphics: none
+    location: "{{ vm_install_media }}"
+    extra_args: "auto=true interface=auto url=http://{{ ansible_default_ipv4.address }}:{{ http_port }}/preseed.cfg"
+  become: yes
 
-- name: Show VM deployment result
-  debug:
-    var: vm_deploy_result
+- name: Serve preseed.cfg for VM installation
+  ansible.builtin.command: python3 -m http.server "{{ http_port }}" --bind "{{ ansible_default_ipv4.address }}"
+  args:
+    chdir: "{{ role_path }}/files"
+  delegate_to: localhost
+  async: 7200
+  poll: 0
+  register: serve_preseed
+
+- name: Wait for VM installation to complete
+  wait_for:
+    path: "/var/lib/libvirt/images/{{ vm_name }}.qcow2"
+    timeout: 7200
+  become: yes

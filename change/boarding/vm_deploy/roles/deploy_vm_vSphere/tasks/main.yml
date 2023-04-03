@@ -1,34 +1,86 @@
 ---
-- name: Create VM on vSphere
-  vmware_guest:
+- name: Install required packages for vSphere
+  pip:
+    name: "pyvmomi"
+    state: present
+
+- name: Deploy VM from template
+  community.vmware.vmware_guest:
     hostname: "{{ vcenter_hostname }}"
     username: "{{ vcenter_username }}"
     password: "{{ vcenter_password }}"
-    datacenter: "{{ datacenter }}"
-    cluster: "{{ cluster }}"
-    folder: "{{ folder }}"
+    datacenter: "{{ datacenter_name }}"
+    folder: "{{ vm_folder }}"
     name: "{{ vm_name }}"
-    template: "{{ template }}"
-    state: present
-    customization:
-      existing_vm: "{{ vm_name }}"
-      hostname: "{{ vm_name }}"
-      domain: "{{ domain }}"
+    template: "{{ vm_template }}"
+    cluster: "{{ cluster_name }}"
+    resource_pool: "{{ vm_resource_pool }}"
+    datastore: "{{ vm_datastore }}"
     networks:
-      - name: "{{ network }}"
-        device_type: vmxnet3
+      - name: "{{ vm_network }}"
+        device_type: "vmxnet3"
     hardware:
-      memory_mb: "{{ memory_mb }}"
-      num_cpus: "{{ num_cpus }}"
-      scsi: paravirtual
-      boot_firmware: bios
+      memory_mb: "{{ vm_memory }}"
+      num_cpus: "{{ vm_cpu }}"
     disk:
-      - size_gb: "{{ disk_size_gb }}"
-        type: thin
-        datastore: "{{ datastore }}"
-    wait_for_ip_address: yes
-  register: vm_deploy_result
+      - size_gb: "{{ vm_disk_size }}"
+        type: "thin"
+        datastore: "{{ vm_datastore }}"
+    guest_id: "{{ vm_guest_id }}"
+    customization:
+      hostname: "{{ guest_os_hostname }}"
+      domain: "{{ guest_os_domain }}"
+      timezone: "{{ guest_os_time_zone }}"
+      admin_password: "{{ guest_os_admin_password }}"
+      auto_logon: "{{ guest_os_auto_logon }}"
+      auto_logon_count: "{{ guest_os_auto_logon_count }}"
+    state: "poweredon"
+    validate_certs: no
+  delegate_to: localhost
 
-- name: Show VM deployment result
+- name: Wait for the VM to start
+  community.vmware.vmware_guest_facts:
+    hostname: "{{ vcenter_hostname }}"
+    username: "{{ vcenter_username }}"
+    password: "{{ vcenter_password }}"
+    datacenter: "{{ datacenter_name }}"
+    folder: "{{ vm_folder }}"
+    name: "{{ vm_name }}"
+    validate_certs: no
+  register: vm_facts
+  until: vm_facts.instance.ipv4 != ""
+  retries: 60
+  delay: 10
+  delegate_to: localhost
+
+- name: Display VM IP
   debug:
-    var: vm_deploy_result
+    msg: "The VM IP address is: {{ vm_facts.instance.ipv4 }}"
+
+- name: Add the new VM to the inventory
+  add_host:
+    name: "{{ vm_facts.instance.ipv4 }}"
+    groups: newly_created_vms
+
+- name: Wait for SSH to become available on the new VM
+  wait_for:
+    host: "{{ vm_facts.instance.ipv4 }}"
+    port: 22
+    state: started
+    delay: 5
+    timeout: 300
+  delegate_to: localhost
+
+- name: Install Python on the new VM
+  raw: "yum install -y python"
+  become: true
+  delegate_to: "{{ vm_facts.instance.ipv4 }}"
+
+- name: Gather facts from the new VM
+  setup:
+  delegate_to: "{{ vm_facts.instance.ipv4 }}"
+
+- name: Perform additional tasks on the new VM
+  include_role:
+    name: "your_additional_role"
+  delegate_to: "{{ vm_facts.instance.ipv4 }}"
