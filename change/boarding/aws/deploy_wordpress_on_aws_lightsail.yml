@@ -14,7 +14,7 @@
     - name: Deploy Lightsail instance
       block:
         - name: Create Lightsail instance
-          community.aws.lightsail_instance:
+          amazon.aws.lightsail_instance:
             state: present
             region: "{{ region }}"
             name: "wordpress-instance"

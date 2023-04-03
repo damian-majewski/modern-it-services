@@ -12,7 +12,7 @@
   hosts: sap_app_servers
   gather_facts: yes
   vars:
-    sap_app_url: 'https://bwh.azure.sap-flex.com:1129/lmsl/sumabap/BWH/slui'
+    sap_app_url: 'https://bwh.azure.example.com:1129/lmsl/sumabap/BWH/slui'
   tasks:
     
     - name: Network latency Analysis
@@ -88,3 +88,32 @@
         flat: yes
       when: "'suse' in ansible_os_family|lower"
 
+    - name: Start niping server on HANA DB server
+      command: niping -s
+      args:
+        creates: /tmp/niping_server.pid
+      when: "'hana_db_server' in inventory_hostname"
+      async: 300
+      poll: 0
+      register: niping_server
+
+    - name: Wait for niping server to start
+      wait_for:
+        path: /tmp/niping_server.pid
+        state: present
+      when: "'hana_db_server' in inventory_hostname"
+
+    - name: Run niping client on SAP App server
+      command: niping -c -H {{ hostvars['hana_db_server']['ansible_host'] }}
+      when: "'sap_app_server' in inventory_hostname"
+      register: niping_client
+
+    - name: Display niping client results
+      debug:
+        var: niping_client.stdout_lines
+      when: "'sap_app_server' in inventory_hostname"
+
+    - name: Stop niping server on HANA DB server
+      command: pkill -f "niping -s"
+      when: "'hana_db_server' in inventory_hostname"
+      ignore_errors: yes

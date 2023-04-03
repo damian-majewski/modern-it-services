@@ -14,7 +14,7 @@
     - name: Deploy EC2 instance
       block:
         - name: Create security group
-          community.aws.ec2_group:
+          amazon.aws.ec2_group:
             name: "{{ security_group }}"
             description: "Allow HTTP and SSH"
             region: "{{ region }}"
@@ -32,7 +32,7 @@
           register: security_group_result
 
         - name: Launch EC2 instance
-          community.aws.ec2:
+          amazon.aws.ec2:
             key_name: "{{ key_name }}"
             instance_type: "{{ instance_type }}"
             image: "{{ ami_id }}"

@@ -1,4 +1,3 @@
-# Ensure you have this installed: pip install boto boto3
 ---
 - name: Deploy EC2 Instance on AWS
   hosts: localhost
@@ -7,10 +6,7 @@
     - ec2_vars.yml
   vars_prompt:
     - name: "os_family"
-      prompt: "Enter the OS family (e.g., AmazonLinux2, Ubuntu, RHEL, SUSE):"
-      private: no
-    - name: "hypervisor"
-      prompt: "Enter the hypervisor (e.g., xen, kvm):"
+      prompt: "OS family (AmazonLinux2, CentOS, RedHat, Ubuntu, SLES):"
       private: no
 
   tasks:
@@ -20,25 +16,43 @@
         aws_secret_key: "{{ lookup('env', 'AWS_SECRET_ACCESS_KEY') }}"
       no_log: true
 
-    - name: Get the latest AMI ID for the specified OS_family and hypervisor
-      community.aws.ec2_ami_info:
-        owners: "amazon"
+    - name: Set OS family filter
+      set_fact:
+        os_family_map:
+          AmazonLinux2: "amzn2-ami-hvm-*"
+          CentOS: "CentOS-*-x86_64-*-EBS-*"
+          RedHat: "RHEL-*-x86_64-*-EBS-*"
+          Ubuntu: "ubuntu-*-amd64-server-*-EBS-*"
+          SLES: "SLES-*-x86_64-*-EBS-*"
+        search_filter: "{{ os_family_map[os_family] }}"
+
+    - name: Find the latest AMI
+      amazon.aws.ec2_ami_info:
         filters:
-          architecture: "x86_64"
-          virtualization-type: "{{ hypervisor }}"
-          name: "{{ os_family }}*"
-          root-device-type: "ebs"
-          state: "available"
+          name: "{{ search_filter }}"
+          virtualization-type: hvm
+          root-device-type: ebs
+          architecture: x86_64
+          is-public: true
+        sort: creationDate
+        sort_order: descending
+        sort_start: 0
+        sort_end: 1
+        region: "{{ aws_region }}"
       register: ami_info
 
-    - name: Set AMI ID variable
+    - name: Set the latest AMI ID
       set_fact:
-        ami_id: "{{ ami_info.images | sort(attribute='creation_date', reverse=True) | first | json_query('image_id') }}"
+        ami_id: "{{ ami_info.images[0].image_id }}"
+
+    - name: Display new EC2 instance info
+      debug:
+        var: "{{ ami_info.images[0].image_id }}"
 
     - name: Deploy EC2 instance
       block:
         - name: Create security group
-          community.aws.ec2_group:
+          amazon.aws.ec2_group:
             name: "{{ security_group }}"
             description: "Allow SSH"
             region: "{{ region }}"
@@ -50,7 +64,7 @@
           register: security_group_result
 
         - name: Launch EC2 instance
-          community.aws.ec2:
+          amazon.aws.ec2_instance:
             key_name: "{{ key_name }}"
             instance_type: "{{ instance_type }}"
             image: "{{ ami_id }}"
