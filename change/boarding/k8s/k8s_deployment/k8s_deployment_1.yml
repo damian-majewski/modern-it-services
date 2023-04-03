@@ -1,0 +1,173 @@
+---
+- name: Deploy Kubernetes cluster on KVM
+  hosts: [kvm_hosts]
+  become: true
+  
+  vars:
+    vm_name: kube-{{ item }}
+    bridge_name: virbr1
+    network_cidr: 192.168.100.0/24
+    gateway: 192.168.100.1
+    master_ip: 192.168.100.10
+    worker_ips:
+      - 192.168.100.11
+      - 192.168.100.12
+    k8s_version: 1.18.2-00
+    cni_version: 0.8.6-00
+    calico_version: 3.14.1
+    helm_version: 3.4.2
+    nfs_server: 192.168.100.50
+    nfs_path: /nfs
+  
+  tasks:
+    - name: Install bridge-utils package
+      apt:
+        name: bridge-utils
+        state: latest
+
+    - name: Create network bridge
+      shell: | 
+        brctl addbr {{ bridge_name }}
+        ip addr add {{ gateway }}/24 dev {{ bridge_name }}
+        ip link set {{ bridge_name }} up
+      ignore_errors: true
+
+    - name: Create Kubernetes VMs
+      community.general.libvirt_kvm:
+        name: "{{ vm_name }}"
+        state: running
+        memory: 4096
+        vcpu: 2
+        image: /var/lib/libvirt/images/ubuntu-20.04-server-cloudimg-amd64.img
+        bridge: "{{ bridge_name }}"
+        disks:
+          - size: 50G
+        network:
+          - name: bridge={{ bridge_name }},model=virtio
+            type: network
+            cidr: "{{ network_cidr }}"
+            addresses:
+              - "{{ master_ip }}{{ '/32' if item == 0 else '/24' }}"
+              - "{{ worker_ips[item-1] }}/24"
+        broadcast: "{{ gateway }}"
+        console: ttyS0
+        serial: /dev/pts/0
+        wait_for_cloud_init: true
+      loop: "{{ range(3) | list }}"
+ 
+    - name: Wait for Kubernetes VMs to be ready
+      wait_for:
+        host: "{{ master_ip }}"
+        port: 6443
+        timeout: 300
+      become: false
+      become_user: root
+      connection: local
+
+    - name: Install Docker and Kubernetes packages
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+        state: latest
+      become: true
+
+    - name: Add Kubernetes apt-key
+      apt_key:
+        url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+        state: present
+      become: true
+
+    - name: Add Kubernetes APT repository
+      apt_repository:
+        repo: deb https://apt.kubernetes.io/ kubernetes-xenial main
+        state: present
+      become: true
+
+    - name: Update package index and install Kubernetes packages
+      apt:
+        name:
+          - kubelet={{ k8s_version }}
+          - kubeadm={{ k8s_version }}
+          - kubectl={{ k8s_version }}
+        state: latest
+      become: true
+
+    - name: Initialize Kubernetes cluster
+      command: kubeadm init --pod-network-cidr=10.244.0.0/16 --apiserver-advertise-address={{ master_ip }}
+      register: kubeadm_init
+      become: true
+
+    - name: Copy Kubernetes config file to user home directory
+      become: true
+      copy:
+        content: "{{ lookup('env', 'KUBECONFIG_CONTENT') }}"
+        dest: "/home/{{ ansible_user_id }}/.kube/config"
+        mode: "0600"
+
+    - name: Install CNI plugin
+      shell: |
+        curl -L https://github.com/containernetworking/plugins/releases/download/v{{ cni_version }}/cni-plugins-linux-amd64-v{{ cni_version }}.tgz | tar -xz -C /opt/cni/bin/
+      become: true
+
+    - name: Install Calico network plugin
+      shell: |
+        curl https://docs.projectcalico.org/{{ calico_version }}/manifests/calico.yaml -O
+        kubectl apply -f calico.yaml
+      register: calico_install
+      become: true
+      become_user: root
+      when: kubeadm_init.stdout_lines[2] is search('kubeadm join')
+
+    - name: Install Helm
+      shell: |
+        curl https://get.helm.sh/helm-v{{ helm_version }}-linux-amd64.tar.gz | tar xz
+        mv linux-amd64/helm /usr/local/bin/helm
+      become: true
+
+    - name: Install NFS packages
+      apt:
+        name: nfs-kernel-server nfs-common
+        state: latest
+      become: true
+
+    - name: Install NFS storage class
+      command: |
+        cat <<EOF | kubectl create -f -
+        apiVersion: v1
+        kind: PersistentVolume
+        metadata:
+          name: nfs-pv
+          labels:
+            type: local
+        spec:
+          storageClassName: nfs
+          capacity:
+            storage: 1Gi
+          accessModes:
+            - ReadWriteMany
+          nfs:
+            server: {{ nfs_server }}
+            path: {{ nfs_path }}
+        EOF
+      become: false
+      become_user: root
+
+    - name: Add NFS storage class to default storage class
+      shell: |
+        kubectl patch storageclass standard -p '{"metadata": {"annotations":   {"storageclass.kubernetes.io/is-default-class":"true"}}}'
+      register: nfs_storage_class
+      become: false
+```
+This playbook assumes that you have already set up the necessary KVM infrastructure and have defined the inventory group `kvm_hosts` that includes the hosts on which the Kubernetes VMs will be deployed. Some variables are defined at the beginning of the playbook to customize the deployment to your environment.
+This playbook performs the following tasks:
+- Installs the bridge-utils package and creates a network bridge on the KVM hosts.
+- Deploys three Ubuntu VMs on the KVM hosts: one master node and two worker nodes. These VMs are connected to a virtual network that is bridged to the KVM host's physical network using the bridge created earlier.
+- Installs Docker and Kubernetes packages on the VMs.
+- Initializes a Kubernetes cluster on the master node.
+- Installs the Calico network plugin and the Helm package manager on the Kubernetes cluster.
+- Installs the NFS packages and creates an NFS storage class for dynamic provisioning of persistent volumes.
+This is just a sample playbook and may require customization to suit your specific environment and requirements.

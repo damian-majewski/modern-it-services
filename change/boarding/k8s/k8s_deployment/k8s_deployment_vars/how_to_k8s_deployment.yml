@@ -1,0 +1,90 @@
+---
+- name: Installation of K8S cluster
+  hosts: 
+  become: true
+  tasks:
+
+    - name: Install KVM packages
+      apt:
+        name:
+          - qemu-kvm
+          - libvirt-bin
+          - virtinst
+        state: present
+      become: yes
+
+    - name: Create Kubernetes master node
+      virt_install:
+        name: "{{ cluster_name }}-master"
+        ram: 2048
+        vcpus: 2
+        disk_size: 20
+        graphics: none
+        console: ttyAMA0
+        os_variant: ubuntu18.04
+        cdrom: "{{ playbooks_dir }}/ubuntu-18.04.3-server-amd64.iso"
+        disk_interface: virtio
+        disks:
+          - size: 20
+            path: /var/lib/libvirt/images/{{ cluster_name }}-master.qcow2
+        network:
+          - {{ "network=default,mac=52:54:00:aa:bb:cc" }}
+        extra_args: "--virt-type=kvm"
+      become: yes
+
+    - name: Create Kubernetes worker nodes
+      virt_install:
+        name: "{{ cluster_name }}-worker-{{ item }}"
+        ram: 2048
+        vcpus: 2
+        disk_size: 20
+        graphics: none
+        console: ttyAMA0
+        os_variant: ubuntu18.04
+        cdrom: "{{ playbooks_dir }}/ubuntu-18.04.3-server-amd64.iso"
+        disk_interface: virtio
+        disks:
+          - size: 20
+            path: /var/lib/libvirt/images/{{ cluster_name }}-worker-{{ item }}.qcow2
+        network:
+          - {{ "network=default,mac=52:54:01:aa:bb:cc" }}
+        extra_args: "--virt-type=kvm"
+      with_items: "{{ worker_nodes }}"
+      become: yes
+
+    - name: Install Docker and Kubernetes packages
+      apt:
+        name:
+          - docker.io
+          - apt-transport-https
+          - curl
+          - gnupg-agent
+          - software-properties-common
+          - kubelet={{ kube_version }}
+          - kubeadm={{ kube_version }}
+          - kubectl={{ kube_version }}
+        state: present
+      become: yes
+    
+    - name: Initialize Kubernetes cluster
+      shell: |
+        kubeadm init --apiserver-advertise-address={{ master_node }}
+        mkdir -p $HOME/.kube
+        sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+        sudo chown $(id -u):$(id -g) $HOME/.kube/config
+      args:
+        executable: /bin/bash
+      become: yes
+    
+    - name: Join worker nodes to Kubernetes cluster
+      shell: |
+        kubeadm join {{ master_node }}:6443 --token <token> \
+        --discovery-token-ca-cert-hash sha256:<hash>
+      become: yes
+
+    - name: Install flannel networking plugin
+      shell: |
+        kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
+      args:
+        executable: /bin/bash
+      become: yes

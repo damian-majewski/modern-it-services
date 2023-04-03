@@ -1,0 +1,90 @@
+---
+- name: Gather SAP HANA Server IP
+  hosts: db_servers
+  gather_facts: yes
+  tasks:
+    - name: Set SAP HANA server IP variable
+      set_fact:
+        sap_hana_server_ip: "{{ ansible_default_ipv4.address }}"
+      run_once: true
+
+- name: Network Latency Analysis and Performance Monitoring
+  hosts: sap_app_servers
+  gather_facts: yes
+  vars:
+    sap_app_url: 'https://bwh.azure.sap-flex.com:1129/lmsl/sumabap/BWH/slui'
+  tasks:
+    
+    - name: Network latency Analysis
+      block: 
+    
+        - name: Ping SAP HANA server
+          command: ping -c 4 {{ hostvars['hana.example.com']['sap_hana_server_ip'] }}
+          register: ping_result
+          changed_when: false
+    
+        - name: Display ping results
+          debug:
+            var: ping_result.stdout_lines
+    
+        - name: Traceroute to SAP HANA server
+          command: traceroute {{ hostvars['hana.example.com']['sap_hana_server_ip'] }}
+          register: traceroute_result
+          changed_when: false
+          when: "'suse' in ansible_os_family|lower"
+    
+        - name: Display traceroute results (Linux)
+          debug:
+            var: traceroute_result.stdout_lines
+    
+        - name: Gather system information
+          setup:
+            gather_subset: all
+            filter: "ansible_hostname,ansible_os_family,ansible_system,ansible_interfaces,ansible_default_ipv4"
+    
+        - name: Display gathered system information
+          debug:
+            var: hostvars[inventory_hostname]
+
+    - name: Install required packages (SLES)
+      package:
+        name:
+          - apache2-utils
+          - iftop
+        state: present
+      when: "'suse' in ansible_os_family|lower"
+
+    - name: Application load testing using ab
+      command: ab -n 100 -c 10 {{ sap_app_url }}
+      register: ab_result
+      changed_when: false
+      when: "'suse' in ansible_os_family|lower"
+
+    - name: Display application load testing results
+      debug:
+        var: ab_result.stdout_lines
+      when: "'suse' in ansible_os_family|lower"
+
+    - name: Start bandwidth monitoring using iftop (SLES)
+      shell: iftop -t -s 10 -n -N -L 10 -B > iftop_output.txt
+      args:
+        executable: /bin/bash
+      async: 20
+      poll: 0
+      when: "'suse' in ansible_os_family|lower"
+
+    - name: Wait for iftop to finish
+      async_status:
+        jid: "{{ ansible_job_id }}"
+      register: job_result
+      until: job_result.finished
+      retries: 30
+      when: "'suse' in ansible_os_family|lower"
+
+    - name: Fetch iftop output file
+      fetch:
+        src: iftop_output.txt
+        dest: ./iftop_output/{{ inventory_hostname }}_iftop_output.txt
+        flat: yes
+      when: "'suse' in ansible_os_family|lower"
+

@@ -1,0 +1,97 @@
+---
+- name: Deploy Kubernetes cluster on Hyper-V
+  hosts: all
+  become: yes
+  tasks:
+    - name: Install required packages
+      ansible.builtin.package:
+        name:
+          - "linux-image-extra-{{ ansible_kernel }}"
+          - linux-image-extra-virtual
+        state: present
+
+    - name: Load Hyper-V kernel modules
+      ansible.builtin.modprobe:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - hv_vmbus
+        - hv_storvsc
+        - hv_utils
+        - hv_netvsc
+
+    - name: Ensure Hyper-V kernel modules are loaded at boot
+      ansible.builtin.lineinfile:
+        path: /etc/modules
+        line: "{{ item }}"
+        state: present
+      loop:
+        - hv_vmbus
+        - hv_storvsc
+        - hv_utils
+        - hv_netvsc
+
+    - name: Install Docker
+      ansible.builtin.package:
+        name: docker.io
+        state: present
+
+    - name: Enable and start Docker service
+      ansible.builtin.systemd:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Add Kubernetes repository
+      ansible.builtin.apt_repository:
+        repo: deb https://apt.kubernetes.io/ kubernetes-xenial main
+        state: present
+
+    - name: Install Kubernetes components
+      ansible.builtin.package:
+        name:
+          - kubelet
+          - kubeadm
+          - kubectl
+        state: present
+
+    - name: Initialize Kubernetes master
+      ansible.builtin.shell:
+        cmd: kubeadm init --pod-network-cidr=10.244.0.0/16
+      when: "'k8s-master' in group_names"
+      register: kubeadm_init_result
+      ignore_errors: yes
+
+    - name: Save kubeadm join command
+      ansible.builtin.lineinfile:
+        path: /home/ubuntu/kubeadm_join
+        line: "{{ kubeadm_init_result.stdout_lines[-1] }}"
+        create: yes
+      when: "'k8s-master' in group_names"
+
+    - name: Set up Kubernetes config for ubuntu user
+      ansible.builtin.become:
+        user: ubuntu
+        become: yes
+      ansible.builtin.shell:
+        cmd: |
+          mkdir -p $HOME/.kube
+          sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+          sudo chown $(id -u):$(id -g) $HOME/.kube/config
+      when: "'k8s-master' in group_names"
+
+    - name: Install Flannel networking
+      ansible.builtin.shell:
+        cmd: kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
+      when: "'k8s-master' in group_names"
+
+    - name: Wait for kubeadm join command
+      ansible.builtin.wait_for:
+        path: /home/ubuntu/kubeadm_join
+        timeout: 60
+      when: "'k8s-worker' in group_names"
+
+    - name: Join Kubernetes cluster
+      ansible.builtin.shell:
+        cmd: cat /home/ubuntu/kubeadm_join | sh
+      when: "'k8s-worker' in group_names"

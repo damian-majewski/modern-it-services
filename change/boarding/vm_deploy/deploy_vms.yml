@@ -1,0 +1,9 @@
+---
+- name: Deploy VMs on KVM and vSphere
+  hosts: localhost
+  gather_facts: no
+  roles:
+    - role: deploy_vm_KVM
+      when: "'KVM' in deployment_type"
+    - role: deploy_vm_vSphere
+      when: "'vSphere' in deployment_type"

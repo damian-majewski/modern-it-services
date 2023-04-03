@@ -1,0 +1,49 @@
+<?xml version="1.0"?>
+<!DOCTYPE profile>
+<profile xmlns="http://www.suse.com/1.0/yast2ns" xmlns:config="http://www.suse.com/1.0/configns">
+  <general>
+    <mode>
+      <confirm config:type="boolean">false</confirm>
+    </mode>
+  </general>
+  <keyboard>
+    <keymap>us</keymap>
+  </keyboard>
+  <language>
+    <language>en_US</language>
+    <languages>en_US</languages>
+  </language>
+  <networking>
+    <start_immediately config:type="boolean">true</start_immediately>
+  </networking>
+  <partitioning config:type="list">
+    <drive>
+      <device>/dev/sda</device>
+      <initialize config:type="boolean">true</initialize>
+      <use>all</use>
+      <partitions config:type="list">
+        <partition>
+          <mount>/</mount>
+          <filesystem config:type="symbol">ext4</filesystem>
+          <size>max</size>
+        </partition>
+      </partitions>
+    </drive>
+  </partitioning>
+  <software>
+    <packages config:type="list">
+      <package>openssh</package>
+    </packages>
+  </software>
+  <timezone>
+    <hwclock>UTC</hwclock>
+    <timezone>US/Pacific</timezone>
+  </timezone>
+  <users config:type="list">
+    <user>
+      <username>root</username>
+      <user_password>rootpass</user_password>
+      <encrypted config:type="boolean">false</encrypted>
+    </user>
+  </users>
+</profile>

@@ -1,0 +1,41 @@
+---
+- name: Przygotuj maszynę gospodarza
+  hosts: kvm_host
+  become: yes
+  tasks:
+  - name: Zaktualizuj system
+    apt:
+      update_cache: yes
+      upgrade: safe
+
+  - name: Zainstaluj niezbędne pakiety
+    apt:
+      name:
+        - qemu-kvm
+        - libvirt-daemon-system
+        - libvirt-clients
+        - virtinst
+        - bridge-utils
+        - virt-manager
+      state: present
+
+---
+- name: Stwórz maszyny wirtualne
+  hosts: kvm_host
+  become: yes
+  tasks:
+  - name: Stwórz maszynę wirtualną dla mastera Kubernetes
+    virt:
+      name: k8s-master
+      state: running
+      vcpus: 2
+      memory: 2048
+      disk:
+        size: 10G
+      os_type: hvm
+      os_variant: ubuntu20.04
+      network:
+        bridge: br0
+      graphics: none
+      location: 'http://archive.ubuntu.com/ubuntu/dists/focal/main/installer-amd64/'
+      extra_args: 'auto=true interface=auto hostname=k8s-master domain=example.com locale=en_US.UTF-8 console-setup/ask_detect=false keyboard-configuration/layoutcode=us netcfg/get_gateway=192.168.1.1 netcfg/get_ipaddress=192.168.1.100 netcfg/get_netmask=255.255.255.0 netcfg/get_nameservers=192.168.1.1 netcfg/disable_dhcp=true preseed/url=http://example.com/preseed.cfg'

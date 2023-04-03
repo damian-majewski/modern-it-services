@@ -1,0 +1,33 @@
+---
+- name: Automated VM deployment on vSphere and KVM
+  hosts: all
+  become: yes
+  tasks:
+    - name: Install required packages for VM deployment
+      ansible.builtin.package:
+        name:
+          - python-pip
+          - python-ovirt-engine-sdk4
+          - python-vmware
+        state: present
+      when: "'kvm' in group_names or 'vSphere' in group_names"
+
+    - name: Install PyVmomi (vSphere Python SDK)
+      ansible.builtin.pip:
+        name: pyvmomi
+      when: "'vSphere' in group_names"
+
+    - name: Install ovirt-engine-sdk-python (oVirt/Red Hat Virtualization SDK)
+      ansible.builtin.pip:
+        name: ovirt-engine-sdk-python
+      when: "'kvm' in group_names"
+
+    - name: Deploy VM on vSphere
+      import_role:
+        name: deploy_vm_vSphere
+      when: "'vSphere' in group_names"
+
+    - name: Deploy VM on KVM
+      import_role:
+        name: deploy_vm_KVM
+      when: "'kvm' in group_names"

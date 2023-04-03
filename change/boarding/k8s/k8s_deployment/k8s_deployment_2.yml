@@ -1,0 +1,120 @@
+---
+- name: Install and configure Kubernetes on KVM
+  hosts: k8s-servers
+  become: true
+  vars:
+    kubernetes_version: "1.22.0-00"
+  tasks:
+
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+
+    - name: Install required packages
+      apt:
+        name: ["apt-transport-https", "ca-certificates", "curl", "software-properties-common", "python3-pip", "libvirt-clients", "libvirt-daemon-system", "qemu-kvm", "bridge-utils", "vlan", "libguestfs-tools", "cpu-checker"]
+        state: present
+
+    - name: Install Docker
+      apt:
+        name: ["docker.io"]
+        state: latest
+
+    - name: Add the Kubernetes signing key
+      command: "curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -"
+
+    - name: Add the Kubernetes repository
+      apt_repository:
+        repo: deb http://apt.kubernetes.io/ kubernetes-xenial main
+        state: present
+
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+
+    - name: Install kubeadm, kubelet, and kubectl
+      apt:
+        name: "["kubeadm={{kubernetes_version}}", "kubelet={{kubernetes_version}}", "kubectl={{kubernetes_version}}"]"
+        state: present
+
+    - name: Enable kernel modules on boot
+      lineinfile:
+        path: /etc/modules-load.d/k8s.conf
+        line: "{{ item }}"
+      with_items:
+        - br_netfilter
+        - ip_vs
+        - ip_vs_rr
+        - ip_vs_wrr
+        - ip_vs_sh
+
+    - name: Ensure kernel parameters are set
+      lineinfile:
+        dest: /etc/sysctl.d/k8s.conf
+        line: "{{ item }}"
+      with_items:
+        - net.bridge.bridge-nf-call-ip6tables = 1
+        - net.bridge.bridge-nf-call-iptables = 1
+        - net.ipv4.ip_forward = 1
+
+    - name: Reload sysctl
+      sysctl:
+        name: net.bridge.bridge-nf-call-iptables
+        value: 1
+        state: present
+        reload: yes
+
+    - name: Reload sysctl
+      sysctl:
+        name: net.ipv4.ip_forward
+        value: 1
+        state: present
+        reload: yes
+
+    - name: Create Kubernetes cluster
+      shell: |
+        kubeadm init --pod-network-cidr=10.244.0.0/16 --apiserver-advertise-address={{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}
+      register: k8s_result
+
+    - name: Save kubeadm join command to a file
+      lineinfile:
+        dest: "{{ home_directory }}/.kube/k8s_join_command.sh"
+        mode: 0777
+        line: "{{ k8s_result.stdout_lines[1] }}"
+
+    - name: Copy kubectl config file to user directory
+      command: cp /etc/kubernetes/admin.conf {{ home_directory }}/
+      args:
+        creates: "{{ home_directory }}/admin.conf"
+        become_user: "{{ ansible_user }}"
+
+    - name: Copy kubectl config file to root directory
+      command: cp /etc/kubernetes/admin.conf /root/
+      args:
+        creates: /root/admin.conf
+
+    - name: Install Calico network plugin
+      command: kubectl create -f https://docs.projectcalico.org/v3.14/manifests/calico.yaml
+
+    - name: Print Kubernetes join command
+      debug:
+        var: k8s_result.stdout_lines[1]
+
+    - name: Wait for Kubernetes control plane to be ready
+      shell: kubectl get pods -n kube-system | grep -c "Running"
+      register: num_running_pods
+      until: num_running_pods.stdout | int == 10
+      retries: 10
+
+    - name: Save kubeadm join command to a file
+      lineinfile:
+        dest: "{{ home_directory }}/.kube/k8s_join_command.sh"
+        mode: 0777
+        line: "{{ k8s_result.stdout_lines[1] }}"
+
+  handlers:
+
+    - name: Restart libvirtd service
+      service:
+        name: libvirtd
+        state: restarted

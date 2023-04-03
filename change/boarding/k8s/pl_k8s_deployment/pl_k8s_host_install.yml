@@ -1,0 +1,45 @@
+---
+- name: Instalacja narzędzi Kubernetes
+  hosts: all
+  become: yes
+  tasks:
+  - name: Dodaj repozytorium Kubernetes
+    apt_repository:
+      repo: 'deb https://apt.kubernetes.io/ kubernetes-xenial main'
+      state: present
+      filename: kubernetes
+
+  - name: Dodaj klucz GPG dla repozytorium Kubernetes
+    apt_key:
+      url: 'https://packages.cloud.google.com/apt/doc/apt-key.gpg'
+      state: present
+
+  - name: Zaktualizuj listę pakietów
+    apt:
+      update_cache: yes
+
+  - name: Zainstaluj narzędzia Kubernetes
+    apt:
+      name:
+        - kubelet
+        - kubeadm
+        - kubectl
+    state: present
+
+  - name: Zablokuj wersje narzędzi Kubernetes
+    apt:
+      name:
+        - kubelet
+        - kubeadm
+        - kubectl
+      state: present
+      update_cache: yes
+      dpkg_options: 'force-confold,force-confdef'
+      version: '1.22.0-00'
+   
+  - name: Włącz i uruchom kubelet
+    systemd:
+      name: kubelet
+      state: started
+      enabled: yes
+      daemon_reload: yes

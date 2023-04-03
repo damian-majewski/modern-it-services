@@ -1,0 +1,77 @@
+---
+- name: Instalacja Kubernetes na węzłach
+  hosts: all
+  become: yes
+  tasks:
+    - name: Dodaj repozytorium Kubernetes
+      apt_repository:
+        repo: 'deb https://apt.kubernetes.io/ kubernetes-xenial main'
+        state: present
+        filename: kubernetes
+
+    - name: Instalacja narzędzi Kubernetes
+      apt:
+        name:
+          - kubelet
+          - kubeadm
+          - kubectl
+        state: present
+        update_cache: yes
+
+    - name: Włącz i uruchom kubelet
+      systemd:
+        name: kubelet
+        state: started
+        enabled: yes
+        daemon_reload: yes
+
+---
+- name: Inicjalizacja klastra Kubernetes
+  hosts: k8s-master
+  become: yes
+  tasks:
+    - name: Inicjuj klaster Kubernetes
+      shell: 'kubeadm init --pod-network-cidr=10.244.0.0/16'
+      args:
+        creates: /etc/kubernetes/admin.conf
+
+    - name: Skopiuj plik konfiguracyjny kubectl dla użytkownika root
+      command: 'cp /etc/kubernetes/admin.conf /root/.kube/config'
+      args:
+        creates: /root/.kube/config
+
+    - name: Skopiuj plik konfiguracyjny kubectl dla użytkownika zwykłego
+      command: 'cp /etc/kubernetes/admin.conf /home/{{ ansible_user }}/.kube/config'
+      args:
+        creates: /home/{{ ansible_user }}/.kube/config
+
+    - name: Zainstaluj sieć podów Flannel
+      command: 'kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml'
+      args:
+        creates: /run/flannel/subnet.env
+
+- name: Dołączanie węzłów do klastra
+  hosts: k8s-nodes
+  become: yes
+  tasks:
+    - name: Pobierz token i certyfikat z węzła mastera
+      slurp:
+        src: /etc/kubernetes/admin.conf
+      register: admin_conf
+      delegate_to: k8s-master
+
+    - name: Utwórz plik admin.conf na węzłach
+      copy:
+        content: '{{ admin_conf.content | b64decode }}'
+        dest: /etc/kubernetes/admin.conf
+
+    - name: Wyodrębnij token i hash z pliku admin.conf
+      set_fact:
+        kubeadm_token: "{{ admin_conf.content | b64decode | regex_search('token: ([^\\n]+)', '\\1') }}"
+        kubeadm_cert_hash: "{{ admin_conf.content | b64decode | regex_search('certificate-authority-data: ([^\\n]+)', '\\1') }}"
+      delegate_to: k8s-master
+
+    - name: Dołącz węzeł do klastra Kubernetes
+      command: 'kubeadm join {{ hostvars['k8s-master'].ansible_host }}:6443 --token {{ kubeadm_token }} --discovery-token-ca-cert-hash sha256:{{ kubeadm_cert_hash }}'
+      args:
+        creates: /etc/kubernetes/kubelet.conf

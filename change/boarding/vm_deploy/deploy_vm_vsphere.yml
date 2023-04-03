@@ -1,0 +1,49 @@
+---
+- name: Deploy Linux VM on vSphere
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - vm_vars.yml
+  tasks:
+    - name: Prompt for vSphere credentials
+      pause:
+        prompt: |
+          Please enter your vSphere credentials:
+          vCenter: <vcenter>
+          Username: <username>
+          Password: <password>
+      register: user_input
+
+    - name: Set vSphere credentials as variables
+      set_fact:
+        vcenter: "{{ user_input.user_input.split()[1] }}"
+        username: "{{ user_input.user_input.split()[3] }}"
+        password: "{{ user_input.user_input.split()[5] }}"
+
+    - name: Deploy VM from template
+      community.vmware.vmware_guest:
+        hostname: "{{ vcenter }}"
+        username: "{{ username }}"
+        password: "{{ password }}"
+        validate_certs: no
+        datacenter: "{{ datacenter }}"
+        cluster: "{{ cluster }}"
+        datastore: "{{ datastore }}"
+        name: "{{ vm_name }}"
+        template: "{{ template }}"
+        folder: "{{ folder }}"
+        resource_pool: "{{ resource_pool }}"
+        hardware:
+          num_cpus: "{{ num_cpus }}"
+          memory_mb: "{{ memory_mb }}"
+        networks:
+          - name: "{{ network }}"
+            device_type: "vmxnet3"
+            start_connected: yes
+            type: "dhcp"
+        state: poweredon
+      register: new_vm_info
+
+    - name: Display new VM info
+      debug:
+        var: new_vm_info

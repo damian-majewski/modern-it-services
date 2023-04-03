@@ -1,0 +1,9 @@
+---
+# Define cluster variables
+cluster_name: my-k8s-cluster
+master_node: 192.168.1.100
+worker_nodes:
+  - 192.168.1.101
+  - 192.168.1.102
+  - 192.168.1.103
+kube_version: 1.22.0-00

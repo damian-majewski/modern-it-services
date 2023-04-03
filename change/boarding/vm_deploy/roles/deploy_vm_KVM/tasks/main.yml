@@ -1,0 +1,31 @@
+---
+- name: Create VM on KVM
+  virt:
+    name: "{{ vm_name }}"
+    memory: "{{ memory_mb }}"
+    vcpus: "{{ num_cpus }}"
+    state: running
+    boot_dev: network
+    os_type: "{{ os_type }}"
+    os_variant: "{{ os_variant }}"
+    disk:
+      - size: "{{ disk_size_gb }}"
+        format: qcow2
+        pool: "{{ pool }}"
+    graphics: vnc
+    cloud_init:
+      hostname: "{{ vm_name }}"
+      users:
+        - name: "{{ user }}"
+          gecos: "{{ user }}"
+          groups: wheel
+          sudo: ALL=(ALL) NOPASSWD:ALL
+      disable_root: true
+    kernel: "{{ kernel }}"
+    initrd: "{{ initrd }}"
+    cmdline: "{{ cmdline }}"
+  register: vm_deploy_result
+
+- name: Show VM deployment result
+  debug:
+    var: vm_deploy_result
