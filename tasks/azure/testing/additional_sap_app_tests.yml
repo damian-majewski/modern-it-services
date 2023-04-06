@@ -36,3 +36,14 @@
         - name: Display SAP application logs
           ansible.builtin.debug:
             var: sap_app_logs.stdout_lines
+        
+    - name: Check response time of SAP application
+      block:
+        - name: Measure response time using curl
+          ansible.builtin.command:
+            cmd: curl -o /dev/null -s -w '%{time_total}\n' "http://{{ sap_app_public_ip }}/sap"
+          register: curl_result
+
+        - name: Display response time
+          ansible.builtin.debug:
+            var: curl_result.stdout

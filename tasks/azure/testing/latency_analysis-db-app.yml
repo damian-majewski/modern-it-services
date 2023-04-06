@@ -1,0 +1,175 @@
+---
+- name: Gather SAP HANA Server IP
+  hosts: db_servers
+  gather_facts: yes
+  vars:
+    niping_bin: "/usr/sap/HD2/HDB00/exe/niping"
+  tasks:
+    - name: Set SAP HANA server IP variable
+      set_fact:
+        sap_hana_server_ip: "{{ ansible_default_ipv4.address }}"
+      run_once: true
+
+    - name: Set SAP HANA server IP for sap_app_servers
+      set_fact:
+        sap_hana_server_ip: "{{ sap_hana_server_ip }}"
+      delegate_to: "{{ item }}"
+      delegate_facts: yes
+      loop: "{{ groups['sap_app_servers'] }}"
+
+    - name: Start niping server on HANA DB server
+      shell: "nohup {{ niping_bin }} -s -I 0 & echo $! > /tmp/niping_server.pid && disown"
+      become: yes
+      become_user: hd2adm
+      args:
+        creates: /tmp/niping_server.pid
+      register: niping_server
+
+    - name: Display niping status
+      debug:
+        var: niping_server
+
+- name: Network Latency Analysis and Performance Monitoring
+  hosts: sap_app_servers
+  gather_facts: yes
+  become: yes
+  vars:
+    report_output: []
+    sap_hana_server_ip: "{{ hostvars[groups['db_servers'][0]]['sap_hana_server_ip'] }}"
+    niping_bin: "/usr/sap/BWH/SYS/exe/uc/linuxx86_64/niping"
+  tasks:
+    
+    - name: Install required packages (SLES)
+      package:
+        name:
+          - apache2-utils
+          - iftop
+          - traceroute
+        state: present
+      
+
+    - name: Network latency Analysis
+      block: 
+    
+        - name: Ping SAP HANA server
+          command: ping -c 4 {{ sap_hana_server_ip }}
+          register: ping_result
+          changed_when: false
+    
+        - name: Traceroute to SAP HANA server
+          command: traceroute {{ sap_hana_server_ip }}
+          register: traceroute_result
+          changed_when: false
+          
+        - name: Gather system information
+          setup:
+            gather_subset: !all, all_ipv6_addresses, apparmor, architecture, caps, chroot, cmdline, date_time, default_ipv4, default_ipv6, devices, distribution, distribution_major_version, distribution_release, distribution_version, dns, env, facter, fips, hardware, interfaces, iscsi, kernel, local, lsb, machine, machine_id, network, ohai, os_family, pkg_mgr, platform, processor, processor_cores, processor_count, system, system_capabilities, system_capabilities_enforced, virtual, virtualization_role, virtualization_type
+
+        - name: Measure network latency using MTR
+          command:
+            cmd: mtr -c 10 -r -w "{{ sap_hana_server_ip }}"
+          register: mtr_result
+
+        - name: Measure network throughput using iperf
+          command:
+            cmd: iperf -c {{ sap_hana_server_ip }} -t 30 -P 4 -i 1
+          register: iperf_result
+
+    - name: Bandwith monitoring with iftop
+      block: 
+    
+        - name: Start bandwidth monitoring using iftop (SLES)
+          shell: iftop -t -s 10 -n -N -L 10 -B >> iftop_output.txt
+          args:
+            executable: /bin/bash
+          async: 20
+          poll: 0
+          register: iftop_async_result
+    
+        - name: Wait for iftop to finish
+          async_status:
+            jid: "{{ iftop_async_result.ansible_job_id }}"
+          register: job_result
+          until: job_result.finished
+          retries: 30
+
+        - name: Fetch iftop output file
+          fetch:
+            src: iftop_output.txt
+            dest: ./reports/report_iftop_{{ inventory_hostname }}.txt
+            flat: yes
+
+        - name: Remove temp
+          file: 
+            path: iftop_output.txt
+            state: absent
+
+    - name: Niping
+      block: 
+
+        - name: Copy niping script
+          copy:
+            src: ./scripts/niping_client.sh
+            dest: /tmp/niping_script.sh
+    
+        - name: Execute niping script on target server
+          shell: "/bin/bash /tmp/niping_script.sh"
+          register: script_output
+          become: yes
+    
+        - name: Fetch niping output file
+          fetch:
+            src: niping_report.txt
+            dest: ./reports/report_niping_{{ inventory_hostname }}.txt
+            flat: yes
+
+    - name: Collect system information
+      block:
+
+        - name: Measure disk I/O performance using fio
+          command:
+            cmd: fio --name=test --rw=randread --size=1G --time_based --runtime=30s --ioengine=libaio --iodepth=32 --numjobs=4
+          register: fio_result
+
+    - name: Update report_output
+      set_fact:
+        report_output: "{{ report_output + [
+          {'Task': 'Ping SAP HANA server', 'Result': ping_result.stdout_lines},
+          {'Task': 'Traceroute to SAP HANA server', 'Result': traceroute_result.stdout_lines},
+          {'Task': 'Gathered system information', 'Result': hostvars[inventory_hostname]},
+          {'Task': 'Display MTR results', 'Result': mtr_result.stdout_lines},
+          {'Task': 'Display iperf results', 'Result': iperf_result.stdout_lines},
+          {'Task': 'Display fio results', 'Result': fio_result.stdout_lines},
+          {'Task': 'Niping_Client script', 'Result': script_output.stdout_lines}
+        ] }}"  
+
+    - name: Create report file
+      delegate_to: localhost
+      copy:
+        content: |
+          {% for item in report_output %}
+          Task: {{ item.Task }}
+          Result:
+          {% for line in item.Result %}
+          {{ line }}
+          {% endfor %}
+          {% endfor %}
+        dest: "./reports/report_sap_latency_{{ inventory_hostname }}.txt"
+      
+- name: Stop niping on SAP HANA Server IP
+  hosts: db_servers
+  gather_facts: yes
+  become: yes
+  tasks:
+
+        - name: Stop niping server on HANA DB server
+          shell: pkill -f "niping -s"
+          ignore_errors: yes
+
+        - name: Remove temp
+          file: 
+            path: "{{ item }}"
+            state: absent
+          loop:
+            - /tmp/niping_server.pid
+            - /tmp/niping_script.sh

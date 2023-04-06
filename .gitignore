@@ -1,3 +1,4 @@
 **/inventory.ini
-*hosts.ini*
-tasks/azure/testing/inventory.ini
+**/inventory
+**/hosts.ini
+**/reports

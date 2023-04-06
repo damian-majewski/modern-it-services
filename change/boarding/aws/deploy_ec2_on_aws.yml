@@ -29,11 +29,22 @@
     - name: Find the latest AMI
       amazon.aws.ec2_ami_info:
         filters:
-          name: "{{ search_filter }}"
-          virtualization-type: hvm
-          root-device-type: ebs
-          architecture: x86_64
-          is-public: true
+          - name: "name"
+            values: ["{{ search_filter }}"]
+          - name: "owner-alias"
+            values: ["amazon", "aws-marketplace"]
+          - name: "virtualization-type"
+            values: ["hvm"]
+          - name: "root-device-type"
+            values: ["ebs"]
+          - name: "architecture"
+            values: ["x86_64"]
+          - name: "is-public"
+            values: ["true"]
+          - name: "product-code.type"
+            values: ["devpay", "marketplace"]
+          - name: "product-code.value"
+            values: ["*free*"]
         sort: creationDate
         sort_order: descending
         sort_start: 0

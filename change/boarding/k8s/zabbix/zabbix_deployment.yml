@@ -1,0 +1,36 @@
+---
+- name: Deploy Zabbix on Kubernetes
+  hosts: localhost
+  tasks:
+    - name: Create Zabbix namespace
+      command: kubectl create namespace zabbix
+
+    - name: Deploy MySQL for Zabbix
+      command: kubectl apply -f https://raw.githubusercontent.com/zabbix/zabbix-docker/master/kubernetes/mysql/mysql.yaml -n zabbix
+
+    - name: Deploy Zabbix server
+      command: kubectl apply -f https://raw.githubusercontent.com/zabbix/zabbix-docker/master/kubernetes/server/zabbix-server.yaml -n zabbix
+
+    - name: Deploy Zabbix web interface
+      command: kubectl apply -f https://raw.githubusercontent.com/zabbix/zabbix-docker/master/kubernetes/web/zabbix-web.yaml -n zabbix
+
+    - name: Deploy Zabbix web service
+      command: kubectl apply -f https://raw.githubusercontent.com/zabbix/zabbix-docker/master/kubernetes/web/zabbix-web-service.yaml -n zabbix
+
+    - name: Deploy Zabbix agent
+      command: kubectl apply -f https://raw.githubusercontent.com/zabbix/zabbix-docker/master/kubernetes/agent/zabbix-agent.yaml -n zabbix
+
+    - name: Expose Zabbix web interface via LoadBalancer
+      command: kubectl expose deployment zabbix-web --type=LoadBalancer --name=zabbix-web-lb --port=80 --target-port=8080 -n zabbix
+
+    - name: Wait for Zabbix web LoadBalancer IP
+      command: kubectl -n zabbix get svc zabbix-web-lb -o jsonpath="{.status.loadBalancer.ingress[0].ip}"
+      register: zabbix_web_lb_ip
+      retries: 60
+      delay: 10
+      until: zabbix_web_lb_ip.stdout != ""
+
+    - name: Display Zabbix web LoadBalancer IP
+      debug:
+        msg: "Zabbix web interface is available at: http://{{ zabbix_web_lb_ip.stdout }}"
+
