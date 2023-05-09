@@ -1,0 +1,35 @@
+---
+- name: Add a second DNS server to network configuration
+  hosts: all
+  become: yes
+  vars:
+    second_dns: 8.8.4.4
+
+  tasks:
+    - name: Find the primary network interface configuration file on SLES
+      find:
+        paths: /etc/sysconfig/network
+        patterns: 'ifcfg-*'
+        contains: '^STARTMODE.*=.*auto'
+      register: net_config_file
+      when: "'suse' in ansible_distribution|lower"
+
+    - name: Find the primary network interface configuration file on CentOS, Ubuntu, and Proxmox
+      find:
+        paths: /etc/sysconfig/network-scripts
+        patterns: 'ifcfg-*'
+        contains: '^ONBOOT.*=.*yes'
+      register: net_config_file
+      when: "'centos' in ansible_distribution|lower or 'redhat' in ansible_distribution|lower or 'ubuntu' in ansible_distribution|lower or 'debian' in ansible_distribution|lower or 'proxmox' in ansible_distribution|lower"
+
+    - name: Set the primary network interface configuration file path
+      set_fact:
+        net_config_file_path: "{{ net_config_file.files[0].path }}"
+      when: net_config_file.files|length > 0
+
+    - name: Add or update the second DNS server in the configuration file
+      ansible.builtin.lineinfile:
+        path: "{{ net_config_file_path }}"
+        regexp: "^DNS2="
+        line: "DNS2={{ second_dns }}"
+      when: net_config_file.files|length > 0

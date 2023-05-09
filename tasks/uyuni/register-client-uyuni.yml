@@ -1,0 +1,7 @@
+---
+- name: Register clients with Uyuni server
+  hosts: redhat_clients:ubuntu_clients
+  become: true
+  tasks:
+    - name: Register client to Uyuni server
+      command: rhnreg_ks --serverUrl=https://uyuni-server.example.com/XMLRPC --sslCACert=/usr/share/rhn/RHN-ORG-TRUSTED-SSL-CERT --activationkey=<your_activation_key>

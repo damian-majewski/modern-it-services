@@ -1,0 +1,15 @@
+- name: Install and configure fail2ban
+  become: true
+  apt:
+    name: fail2ban
+    state: present
+  when: ansible_os_family == 'Debian'
+  tags: [fail2ban]
+  
+- name: Install and configure fail2ban
+  become: true
+  yum:
+    name: fail2ban
+    state: present
+  when: ansible_os_family == 'RedHat'
+  tags: [fail2ban]

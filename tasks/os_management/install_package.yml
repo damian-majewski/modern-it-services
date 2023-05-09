@@ -1,0 +1,39 @@
+---
+- name: Install Package
+  hosts: all
+  become: yes
+  gather_facts: yes
+
+  vars_prompt:
+    - name: package_input
+      prompt: "Enter package name, local path, or URL"
+      private: no
+
+  tasks:
+    - name: Check if input is a URL
+      set_fact:
+        is_url: "{{ package_input.startswith('http://') or package_input.startswith('https://') }}"
+      when: package_input | length > 0
+
+    - name: Check if input is a local path
+      set_fact:
+        is_local_path: "{{ package_input is file }}"
+      when: package_input | length > 0
+
+    - name: Install RPM package from URL or local path
+      ansible.builtin.yum:
+        name: "{{ package_input }}"
+        state: present
+      when: (is_url or is_local_path) and (ansible_pkg_mgr == 'yum' or ansible_pkg_mgr == 'dnf')
+
+    - name: Install DEB package from URL or local path
+      ansible.builtin.apt:
+        deb: "{{ package_input }}"
+        state: present
+      when: (is_url or is_local_path) and ansible_pkg_mgr == 'apt'
+
+    - name: Install package by name
+      package:
+        name: "{{ package_input }}"
+        state: present
+      when: (not is_url) and (not is_local_path)

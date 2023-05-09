@@ -1,0 +1,78 @@
+---
+- name: SAP Failover and Failback Procedure
+  hosts: sap_cluster
+  gather_facts: no
+  tasks:
+    - name: Check resource state
+      command: pcs status
+      register: pcs_status_output
+
+    - name: Check DB status on both nodes
+      command: your_db_status_command_here
+      register: db_status_output
+
+    - name: Check replication status
+      command: python systemreplicationstatus.py
+      register: replication_status_output
+
+    - name: Check HANA Studio for systemdb and tenantdb status
+      command: your_hana_studio_command_here
+      register: hana_studio_output
+
+    - name: Perform failover from primary to secondary node
+      command: crm_resource -M -r your_resource_here
+
+    - name: Check cluster status after failover
+      command: pcs status
+      register: pcs_status_after_failover
+
+    - name: Check tenantdb and systemdb status after failover
+      command: your_hana_studio_command_here
+      register: hana_studio_output_after_failover
+
+    - name: Check hdb info to ensure node 1 is not listening
+      command: your_hdb_info_command_here
+      register: hdb_info_output
+
+    - name: Configure HANA instance as secondary
+      command: your_cleanup_commands_here
+
+    - name: Trigger replication from node 1
+      command: your_replication_trigger_command_here
+
+    - name: Start hdb on node 1
+      command: your_hdb_start_command_here
+
+    - name: Check hdb info after starting node 1
+      command: your_hdb_info_command_here
+      register: hdb_info_output_after_start
+
+    - name: Check cluster status after failover and failback
+      command: pcs status
+      register: pcs_status_after_failback
+
+    - name: Perform the failback
+      command: your_failback_command_here
+
+    - name: Check cluster status after failback
+      command: pcs status
+      register: pcs_status_after_failback_complete
+
+    - name: Configure HANA as primary
+      command: your_hana_primary_configuration_command_here
+
+    - name: Trigger replication after failback
+      command: your_replication_trigger_command_here
+
+    - name: Check replication status after failback
+      command: python systemreplicationstatus.py
+      register: replication_status_output_after_failback
+
+    - name: Check cluster status and perform resource cleanup if necessary
+      command: pcs status
+      register: pcs_status_final_cleanup
+      changed_when: False
+
+    - name: Perform resource cleanup if necessary
+      command: pcs resource cleanup your_resource_here
+      when: "'FAILED' in pcs_status_final_cleanup.stdout"

@@ -1,0 +1,10 @@
+---
+- name: Create a new database user
+  hosts: database_servers
+  tasks:
+    - name: Create user
+      community.mysql.mysql_user:
+        name: new_user
+        password: new_password
+        priv: '*.*:ALL'
+        state: present

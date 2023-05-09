@@ -1,0 +1,9 @@
+- name: Configure firewall
+  firewalld:
+    service: "{{ item }}"
+    state: enabled
+    immediate: yes
+  loop:
+    - ssh
+    - http
+    - https

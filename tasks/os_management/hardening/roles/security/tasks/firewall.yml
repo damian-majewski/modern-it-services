@@ -1,0 +1,8 @@
+- name: Configure firewalld to detect and block curl/wget download attempts
+  firewalld:
+    rich_rule: 'rule service name="http" log prefix="CURL/WGET DOWNLOAD ATTEMPT: " level="notice" limit value="2/m" burst="1" ~ "\"-m\", \"re\", \"--match\", \"{{regex_pattern}}\", \"--jump\", \"REJECT\""'
+    zone: public
+    permanent: true
+  vars:
+    regex_pattern: "(curl|wget).*(https?:\/\/)?(\b25[0-5]|\b2[0-4][0-9]|\b[01]?[0-9][0-9]?)(\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3}(:[0-9]+)?\/.+.*"
+  # This rule is based on the hint from https://nfsec.pl/security/6490.

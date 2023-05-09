@@ -1,0 +1,19 @@
+---
+- name: Migrate the database to a larger instance type
+  hosts: localhost
+  tasks:
+    - name: Stop the database instance
+      command: aws ec2 stop-instances --instance-ids "{{ instance_id }}"
+
+    - name: Wait for the instance to stop
+      command: aws ec2 wait instance-stopped --instance-ids "{{ instance_id }}"
+      
+    - name: Modify the instance type
+      command: aws ec2 modify-instance-attribute --instance-id "{{ instance_id }}" --instance-type "{{ new_instance_type }}"
+    
+    - name: Start the database instance
+      command: aws ec2 start-instances --instance-ids "{{ instance_id }}"
+    
+    - name: Wait for the instance to start
+      command: aws ec2 wait instance-running --instance-ids "{{ instance_id }}"
+    

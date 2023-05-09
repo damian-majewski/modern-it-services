@@ -1,0 +1,73 @@
+- name: Install essential security packages
+  package:
+    name: "{{ item }}"
+    state: latest
+  loop:
+    - iptables
+    - fail2ban
+    - logrotate
+- name: Set appropriate permissions on sensitive files
+  file:
+    path: "{{ item }}"
+    mode: "0600"
+    owner: root
+    group: root
+  loop:
+    - /etc/shadow
+    - /etc/gshadow
+    - /etc/passwd
+    - /etc/group
+- name: Set secure permissions on /tmp directory
+  file:
+    path: /tmp
+    mode: "1777"
+    owner: root
+    group: root
+    state: directory
+- name: Enable kernel module loading protection
+  sysctl:
+    name: kernel.modules_disabled
+    value: 1
+    state: present
+- name: Set password policy
+  pam_pwquality:
+    minlen: 14
+    ucredit: -1
+    dcredit: -1
+    ocredit: -1
+    lcredit: -1
+- name: Set SSH configurations
+  template:
+    src: sshd_config
+    dest: /etc/ssh/sshd_config
+  notify: restart sshd
+- name: Configure firewall
+  firewalld:
+    service: "{{ item }}"
+    state: enabled
+    immediate: true
+    permanent: true
+  loop:
+    - ssh
+    - http
+    - https
+- name: Enable auditd service
+  service:
+    name: auditd
+    enabled: yes
+    state: started
+- name: Enable automatic security updates
+  lineinfile:
+    path: /etc/apt/apt.conf.d/20auto-upgrades
+    regexp: '^(Unattended-Upgrade::.*")false";'
+    line: '\1true";'
+    state: present
+  when: ansible_os_family == 'Debian'
+  notify: restart unattended-upgrades
+- name: Enable automatic security updates
+  lineinfile:
+    path: /etc/yum.conf
+    regexp: '^#(\s*)updates/info'
+    line: '\1exclude=kernel* centos-release*'
+    state: present
+  when: ansible_os_family == 'RedHat'

@@ -1,0 +1,2 @@
+Username,Password,FirstName,LastName,DisplayName,UserPrincipalName,Path
+jdoe,P@ssw0rd,John,Doe,John Doe,jdoe@example.com,OU=Users,DC=example,DC=com

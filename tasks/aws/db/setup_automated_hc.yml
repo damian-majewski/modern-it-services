@@ -1,0 +1,23 @@
+---
+- name: Set up automated database health checks
+  hosts: database
+  tasks:
+    - name: Install required packages
+      package:
+        name:
+          - python-pip
+          - python-boto
+        state: present
+
+    - name: Create health check script
+      template:
+        src: db_health_check_script.j2
+        dest: /usr/local/bin/db_health_check_script.sh
+        mode: 0755
+
+    - name: Schedule the health check script in cron
+      cron:
+        name: "Database health check"
+        minute: "*/5"
+        user: "root"
+        job: "/usr/local/bin/db_health_check_script.sh"

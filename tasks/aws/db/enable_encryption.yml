@@ -1,0 +1,15 @@
+---
+- name: Enable SSL/TLS encryption for the database
+  hosts: database
+  tasks:
+    - name: Create a directory for SSL certificates
+      file:
+        path: /etc/db_certs
+        state: directory
+
+    - name: Generate SSL certificates
+      command: openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 -keyout /etc/db_certs/server.key -out /etc/db_certs/server.crt -subj "/C={{ ssl_country }}/ST={{ ssl_state }}/L={{ ssl_locality }}/O={{ ssl_organization }}/CN={{ ssl_common_name }}"
+
+    - name: Configure the database to use SSL
+      include_role:
+        name: database_ssl_config

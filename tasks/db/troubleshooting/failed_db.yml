@@ -1,0 +1,29 @@
+- name: Investigate failed database server in Linux cluster
+  hosts: cluster_nodes
+  tasks:
+    - name: Check cluster status
+      ansible.builtin.shell: pcs status
+      register: cluster_status
+
+    - name: Save cluster status to a file
+      ansible.builtin.copy:
+        content: "{{ cluster_status.stdout }}"
+        dest: "/tmp/cluster_status.txt"
+
+    - name: Gather resource group configuration
+      ansible.builtin.shell: pcs config
+      register: resource_group_config
+
+    - name: Save resource group configuration to a file
+      ansible.builtin.copy:
+        content: "{{ resource_group_config.stdout }}"
+        dest: "/tmp/resource_group_config.txt"
+
+    - name: Check cluster logs
+      ansible.builtin.shell: journalctl -u pacemaker
+      register: cluster_logs
+
+    - name: Save cluster logs to a file
+      ansible.builtin.copy:
+        content: "{{ cluster_logs.stdout }}"
+        dest: "/tmp/cluster_logs.txt"

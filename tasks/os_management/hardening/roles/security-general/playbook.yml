@@ -1,0 +1,6 @@
+---
+- name: Apply general security configuration improvements
+  hosts: all
+  become: true
+  roles:
+    - security-general

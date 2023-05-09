@@ -1,0 +1,4 @@
+---
+dependencies:
+  - { role: geerlingguy.firewall }
+  - { role: geerlingguy.unattended-upgrades }

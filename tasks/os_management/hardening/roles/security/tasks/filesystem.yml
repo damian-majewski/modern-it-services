@@ -1,0 +1,27 @@
+- name: Enable password aging and complexity requirements
+  become: true
+  lineinfile:
+    path: /etc/login.defs
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+    state: "{{ item.state }}"
+  loop:
+    - { regexp: "^PASS_MAX_DAYS", line: "PASS_MAX_DAYS   90", state: "present" }
+    - { regexp: "^PASS_MIN_DAYS", line: "PASS_MIN_DAYS   7", state: "present" }
+    - { regexp: "^PASS_MIN_LEN", line: "PASS_MIN_LEN    14", state: "present" }
+    - { regexp: "^PASS_WARN_AGE", line: "PASS_WARN_AGE   7", state: "present" }
+- name: Set up auditing
+  become: true
+  lineinfile:
+    path: /etc/audit/auditd.conf
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+    state: "{{ item.state }}"
+  loop:
+    - { regexp: "^max_log_file", line: "max_log_file = 256", state: "present" }
+    - { regexp: "^max_log_file_action", line: "max_log_file_action = rotate", state: "present" }
+    - { regexp: "^space_left", line: "space_left = 75", state: "present" }
+    - { regexp: "^space_left_action", line: "space_left_action = email", state: "present" }
+    - { regexp: "^action_mail_acct", line: "action_mail_acct = root", state: "present" }
+    - { regexp: "^admin_space_left", line: "admin_space_left = 50", state: "present" }
+    - { regexp: "^admin_space_left_action", line: "admin_space_left_action = halt", state: "present" }

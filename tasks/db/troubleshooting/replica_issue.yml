@@ -1,0 +1,31 @@
+---
+- name: Check replication issues
+  hosts: database_servers
+  tasks:
+    - name: Gather replication configuration
+      ansible.builtin.shell: cat /path/to/replication/config/file
+      register: replication_config
+
+    - name: Save replication configuration to a file
+      ansible.builtin.copy:
+        content: "{{ replication_config.stdout }}"
+        dest: "/tmp/replication_config.txt"
+
+    - name: Check replication status
+      ansible.builtin.shell: /path/to/replication/status/command
+      register: replication_status
+
+    - name: Save replication status to a file
+      ansible.builtin.copy:
+        content: "{{ replication_status.stdout }}"
+        dest: "/tmp/replication_status.txt"
+
+    - name: Check replication logs
+      ansible.builtin.shell: /path/to/replication/logs/command
+      register: replication_logs
+
+    - name: Save replication logs to a file
+      ansible.builtin.copy:
+        content: "{{ replication_logs.stdout }}"
+        dest: "/tmp/replication_logs.txt"
+     

@@ -1,0 +1,19 @@
+- name: Disable unused services and ports
+  service:
+    name: "{{ item }}"
+    state: stopped
+    enabled: no
+  loop:
+    - xinetd
+    - avahi-daemon
+    - bluetooth
+    - cups
+- name: Remove unused packages
+  package:
+    name: "{{ item }}"
+    state: absent
+  loop:
+    - telnet
+    - rsh
+    - rlogin
+    - ypserv

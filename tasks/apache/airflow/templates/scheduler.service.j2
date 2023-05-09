@@ -1,0 +1,15 @@
+[Unit]
+Description=Airflow scheduler
+After=network.target
+
+[Service]
+User={{ airflow_user }}
+Group={{ airflow_group }}
+Environment=AIRFLOW_HOME={{ airflow_home }}
+ExecStart={{ ansible_env.PATH.split(':')[-1] }}/airflow scheduler
+Restart=on-failure
+RestartSec=5s
+KillMode=process
+
+[Install]
+WantedBy=multi-user.target

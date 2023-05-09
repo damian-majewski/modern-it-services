@@ -1,0 +1,7 @@
+---
+- name: Analyze and optimize database tables
+  hosts: database
+  tasks:
+    - name: Run analyze and optimize queries
+      include_role:
+        name: database_optimization

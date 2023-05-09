@@ -1,0 +1,49 @@
+---
+- name: Configure Uyuni client for Red Hat
+  hosts: redhat_clients
+  become: true
+  tasks:
+    - name: Import Uyuni GPG key
+      rpm_key:
+        key: https://www.uyuni-project.org/uyuni.asc
+        state: present
+
+    - name: Add Uyuni client repository
+      yum_repository:
+        name: uyuni-client-rhel
+        description: Uyuni Client for RHEL
+        baseurl: https://download.opensuse.org/repositories/systemsmanagement:/Uyuni:/Clients:/RHEL{{ ansible_distribution_major_version }}/x86_64/
+        gpgcheck: yes
+        gpgkey: https://www.uyuni-project.org/uyuni.asc
+        state: present
+
+    - name: Install Uyuni client tools
+      yum:
+        name:
+          - uyuni-client-tools
+          - rhn-client-tools
+        state: present
+
+
+---
+- name: Configure Uyuni client for Ubuntu
+  hosts: ubuntu_clients
+  become: true
+  tasks:
+    - name: Add Uyuni client repository
+      apt_repository:
+        repo: 'deb https://download.opensuse.org/repositories/systemsmanagement:/Uyuni:/Clients:/Ubuntu{{ ansible_distribution_release }}/xUbuntu_{{ ansible_distribution_release }}/ /'
+        state: present
+        filename: 'uyuni-client-ubuntu'
+
+    - name: Import Uyuni GPG key
+      apt_key:
+        url: https://www.uyuni-project.org/uyuni.asc
+        state: present
+
+    - name: Install Uyuni client tools
+      apt:
+        pkg:
+          - uyuni-client-tools
+          - spacewalk-client-tools
+        state: present

@@ -1,0 +1,133 @@
+---
+- name: Install Apache Airflow
+  hosts: all
+  become: yes
+  vars:
+    airflow_version: "2.2.0"
+    airflow_home: "/opt/airflow"
+    airflow_user: "airflow"
+    airflow_group: "airflow"
+    python_version: "3.8"
+
+  tasks:
+    - name: Install required system packages
+      apt:
+        name:
+          - "python{{ python_version }}"
+          - "python{{ python_version }}-dev"
+          - "python3-pip"
+          - "build-essential"
+          - "libssl-dev"
+          - "libffi-dev"
+          - "libxml2-dev"
+          - "libxslt1-dev"
+          - "zlib1g-dev"
+        state: present
+
+    - name: Ensure Airflow group exists
+      group:
+        name: "{{ airflow_group }}"
+        state: present
+
+    - name: Ensure Airflow user exists
+      user:
+        name: "{{ airflow_user }}"
+        group: "{{ airflow_group }}"
+        home: "{{ airflow_home }}"
+        shell: /bin/bash
+        state: present
+
+    - name: Create Airflow home directory
+      file:
+        path: "{{ airflow_home }}"
+        state: directory
+        owner: "{{ airflow_user }}"
+        group: "{{ airflow_group }}"
+        mode: '0755'
+
+    - name: Upgrade pip
+      pip:
+        name: pip
+        state: latest
+        executable: /usr/bin/pip3
+
+    - name: Install Apache Airflow
+      pip:
+        name: "apache-airflow=={{ airflow_version }}"
+        state: present
+        executable: /usr/bin/pip3
+      environment:
+        AIRFLOW_HOME: "{{ airflow_home }}"
+        SLUGIFY_USES_TEXT_UNIDECODE: "yes"
+
+    - name: Create Airflow configuration directory
+      file:
+        path: "{{ airflow_home }}/airflow.cfg.d"
+        state: directory
+        owner: "{{ airflow_user }}"
+        group: "{{ airflow_group }}"
+        mode: '0755'
+
+    - name: Configure Airflow
+      blockinfile:
+        path: "{{ airflow_home }}/airflow.cfg"
+        block: |
+          [core]
+          executor = LocalExecutor
+          sql_alchemy_conn = sqlite:///{{ airflow_home }}/airflow.db
+          dags_folder = {{ airflow_home }}/dags
+          plugins_folder = {{ airflow_home }}/plugins
+          base_log_folder = {{ airflow_home }}/logs
+          load_examples = False
+        create: yes
+        owner: "{{ airflow_user }}"
+        group: "{{ airflow_group }}"
+        mode: '0644'
+
+    - name: Create Airflow DAGs, plugins, and logs directories
+      file:
+        path: "{{ airflow_home }}/{{ item }}"
+        state: directory
+        owner: "{{ airflow_user }}"
+        group: "{{ airflow_group }}"
+        mode: '0755'
+      loop:
+        - dags
+        - plugins
+        - logs
+
+    - name: Initialize Airflow database
+      command:
+        cmd: "airflow db init"
+        creates: "{{ airflow_home }}/airflow.db"
+      become_user: "{{ airflow_user }}"
+      environment:
+        AIRFLOW_HOME: "{{ airflow_home }}"
+        PATH: "{{ ansible_env.PATH }}:/home/{{ airflow_user }}/.local/bin"
+
+    - name: Start Airflow webserver and scheduler services
+      systemd:
+        name: "airflow-{{item }}"
+        state: started
+        enabled: yes
+        daemon_reload: yes
+        loop:
+        - webserver
+        - scheduler
+
+    - name: Create Airflow webserver and scheduler service files
+      template:
+        src: "{{ item }}.service.j2"
+        dest: "/etc/systemd/system/airflow-{{ item }}.service"
+        owner: root
+        group: root
+        mode: '0644'
+      loop:
+        - webserver
+        - scheduler
+      notify:
+        - reload systemd
+      handlers:
+        - name: reload systemd
+          systemd:
+            daemon_reload: yes

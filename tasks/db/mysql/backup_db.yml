@@ -1,0 +1,49 @@
+---
+- name: Backup database
+  hosts: database_servers
+  tasks:
+    - name: Create backup directory
+      ansible.builtin.file:
+        path: /backup/mysql
+        state: directory
+      tags: backup_db
+
+    - name: Backup database
+      community.mysql.mysql_db:
+        name: my_database
+        state: dump
+        target: /backup/mysql/my_database.sql
+      tags: backup_db
+
+    - name: Restore database from backup
+      community.mysql.mysql_db:
+        name: my_database
+        state: import
+        target: /backup/mysql/my_database.sql
+      tags: restore_db
+
+
+---
+- name: Set up automated database backups
+  hosts: database
+  tasks:
+    - name: Install required packages
+      package:
+        name:
+          - python-pip
+          - python-boto
+        state: present
+
+    - name: Create backup script
+      template:
+        src: db_backup_script.j2
+        dest: /usr/local/bin/db_backup_script.sh
+        mode: 0755
+
+    - name: Schedule the backup script in cron
+      cron:
+        name: "Database backup"
+        minute: "0"
+        hour: "2"
+        user: "root"
+        job: "/usr/local/bin/db_backup_script.sh"

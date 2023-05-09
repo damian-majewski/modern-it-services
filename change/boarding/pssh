@@ -1,0 +1,12 @@
+server_list_files=($(ls company_*))
+
+for server_list in "${server_list_files[@]}"; do
+    echo "Processing $server_list"
+
+    pssh -h "$server_list" -i 'sudo grep -E "(cifs|nfs)" /etc/fstab | grep -v ^# || (echo "No CIFS or NFS filesystems found in /etc/fstab or currently mounted.")'
+
+    pssh -h "$server_list" -i 'sudo grep -E "^(\S+://|\S+\\\\|\\\\\S+)" /etc/fstab | while read -r line; do server_share=$(echo "$line" | sudo awk "{print \$1}"); username=$(echo "$line" | sudo awk -F "username=" "{print \$2}" | sudo awk -F "," "{print \$1}"); password=$(echo "$line" | sudo awk -F "password=" "{print \$2}" | sudo awk -F "," "{print \$1}"); sudo smbclient -L "$server_share" -U "$username%$password" -m SMB3 2>&1 | sudo grep -oP "Selected protocol: \K\w+"; done'
+
+    echo "Finished processing $server_list"
+    echo ""
+done

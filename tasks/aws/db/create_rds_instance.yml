@@ -1,0 +1,20 @@
+---
+- name: Create an RDS instance
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Create RDS instance
+      amazon.aws.rds_instance:
+        region: us-west-2
+        instance_name: my_rds_instance
+        engine: mysql
+        engine_version: "8.0"
+        publicly_accessible: yes
+        instance_type: db.t2.micro
+        username: my_user
+        password: my_password
+        allocated_storage: 20
+        db_subnet_group_name: my_subnet_group
+        vpc_security_group_ids:
+          - sg-1234567890abcdef0
+      register: rds_instance

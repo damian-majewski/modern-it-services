@@ -31,10 +31,6 @@ installed_packages_conflicts() {
   fi
 }
 
-# Call the function
-installed_packages_conflicts
-
-
 system_info() {
   echo "=== System Information ==="
   uname -a
@@ -100,7 +96,11 @@ network_info() {
   echo "=== Network Traffic ==="
   sar -n DEV 2 10
   echo "=== Network Bandwidth and Usage ==="
-  iftop -t -s 5
+    if command -v iftop > /dev/null 2>&1; then
+    iftop -t -s 5
+  else
+    echo "iftop command not found. Skipping network bandwidth and usage."
+  fi
 }
 
 swap_usage() {
@@ -125,6 +125,27 @@ check_nfs_mounts() {
   cat /etc/fstab | egrep -e "cifs|nfs" | grep -v ^# | wc -l 
 }
 
+disk_speed_test() {
+  echo "=== Disk Speed Test ==="
+  if command -v dd > /dev/null 2>&1; then
+    echo "----- Write Speed -----"
+    dd if=/dev/zero of=/tmp/output bs=8k count=10k conv=fdatasync && rm -f /tmp/output
+    echo "----- Read Speed -----"
+    dd if=/tmp/output of=/dev/null bs=8k
+  else
+    echo "dd command not found. Skipping disk speed test."
+  fi
+}
+
+memory_errors_check() {
+  echo "=== Memory Errors ==="
+  if command -v dmesg > /dev/null 2>&1; then
+    dmesg | grep -i "memory" | grep -i -e "error" -e "failure" -e "corrupted"
+  else
+    echo "dmesg command not found. Skipping memory errors check."
+  fi
+}
+
 # Call functions
 system_info
 resource_usage
@@ -139,3 +160,5 @@ hardware_info
 journal_errors
 installed_packages_conflicts
 check_nfs_mounts
+disk_speed_test
+memory_errors_check

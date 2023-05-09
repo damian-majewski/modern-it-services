@@ -1,0 +1,12 @@
+---
+- name: Modify an RDS instance
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Modify RDS instance
+      amazon.aws.rds_instance:
+        region: us-west-2
+        instance_name: my_rds_instance
+        instance_type: db.t2.small
+        allocated_storage: 25
+        apply_immediately: yes

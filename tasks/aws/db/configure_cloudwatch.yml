@@ -1,0 +1,25 @@
+- name: Monitor database CPU and memory usage
+  hosts: database
+  tasks:
+    - name: Install required packages
+      package:
+        name:
+          - python-pip
+          - python-psutil
+        state: present
+
+    - name: Install the AWS CloudWatch agent
+      pip:
+        name: amazon-cloudwatch-agent
+        state: present
+
+    - name: Configure the CloudWatch agent
+      template:
+        src: cloudwatch-agent-config.j2
+        dest: /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
+
+    - name: Start the CloudWatch agent
+      systemd:
+        name: amazon-cloudwatch-agent
+        state: started
+        enabled: yes

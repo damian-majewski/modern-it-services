@@ -1,0 +1,5 @@
+- name: Harden Linux Server
+  hosts: all
+  become: yes
+  roles:
+    - harden_linux_server

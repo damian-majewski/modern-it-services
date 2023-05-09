@@ -1,0 +1,13 @@
+Unattended-Upgrade::Automatic-Reboot "true";
+Unattended-Upgrade::Automatic-Reboot-Time "02:00";
+{% if configure_email_notifications is defined and configure_email_notifications is sameas true %}
+Unattended-Upgrade::Mail "root@{{ ansible_fqdn }}";
+Unattended-Upgrade::MailOnlyOnError "true";
+{% endif %}
+Unattended-Upgrade::Remove-Unused-Dependencies "true";
+Unattended-Upgrade::Allowed-Origins {
+${distro_id}:${distro_codename}-security;
+// ${distro_id}:${distro_codename}-updates
+// ${distro_id}:${distro_codename}-proposed;
+// ${distro_id}:${distro_codename}-backports;
+};

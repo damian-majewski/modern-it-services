@@ -1,0 +1,91 @@
+# pip install pyvmomi
+# ansible-playbook -i vmware.yml os_management/os_patching_vmware_dynamic.yml
+---
+- name: Pre-patching tasks
+  hosts: 'tagged_redhat_vms'
+  tasks:
+    - name: Create VM snapshot
+      community.vmware.vmware_guest_snapshot:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: no
+        datacenter: "{{ vcenter_datacenter }}"
+        folder: "{{ vcenter_folder }}"
+        name: "{{ inventory_hostname }}"
+        state: present
+        snapshot_name: pre_patch_snapshot
+        description: "Snapshot before patching"
+        quiesce: yes
+
+
+- name: Gather VMware vSphere inventory
+  hosts: localhost
+  tasks:
+    - name: Retrieve VM inventory from vSphere
+      vmware.vmware_rest.vcenter_vm_info:
+        vcenter_username: 'your_vcenter_username'
+        vcenter_password: 'your_vcenter_password'
+        vcenter_hostname: 'vcenter.example.com'
+        validate_certs: no
+      register: vms
+
+    - name: Add Red Hat VMs to dynamic inventory
+      ansible.builtin.add_host:
+        name: "{{ item.name }}"
+        ansible_host: "{{ item.guest.ip_addresses[0] }}"
+        groups: redhat_vms
+      loop: "{{ vms.value }}"
+      when: "'Red Hat' in item.guest.guest_full_name"
+
+- name: Patch Red Hat VMs with Red Hat Satellite
+  hosts: redhat_vms
+  become: yes
+  tasks:
+    - name: Register system to Red Hat Satellite
+      redhat_subscription:
+        state: present
+        username: 'your_satellite_username'
+        password: 'your_satellite_password'
+        org_id: 'your_org_id'
+        activationkey: 'your_activation_key'
+
+    - name: Enable the necessary repositories
+      rhsm_repository:
+        name: "{{ item }}"
+        state: enabled
+      loop:
+        - rhel-7-server-rpms
+        - rhel-7-server-extras-rpms
+        - rhel-7-server-optional-rpms
+
+    - name: Update packages
+      ansible.builtin.package:
+        name: '*'
+        state: latest
+
+    - name: Reboot the system if required
+      ansible.builtin.reboot:
+        reboot_timeout: 300
+      when: "'Reboot required' in update_packages.stdout_lines"
+
+- name: Patch Red Hat VMs with Red Hat Satellite
+  hosts: 'tagged_redhat_vms'
+  become: yes
+  tasks:
+    # ... (include your patching tasks here)
+
+- name: Post-patching tasks
+  hosts: 'tagged_redhat_vms'
+  tasks:
+    - name: Delete older snapshots
+      community.vmware.vmware_guest_snapshot:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: no
+        datacenter: "{{ vcenter_datacenter }}"
+        folder: "{{ vcenter_folder }}"
+        name: "{{ inventory_hostname }}"
+        state: absent
+        snapshot_name: pre_patch_snapshot

@@ -1,0 +1,5 @@
+- name: Update the system and apply security patches
+  yum:
+    name: "*"
+    state: latest
+    security: yes

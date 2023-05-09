@@ -1,0 +1,24 @@
+---
+- name: Ensure the database service is running
+  hosts: database_servers
+  tasks:
+    - name: Start the database service
+      ansible.builtin.service:
+        name: mysql
+        state: started
+      tags: check_service
+
+    - name: Update my.cnf configuration file
+      ansible.builtin.template:
+        src: my.cnf.j2
+        dest: /etc/mysql/my.cnf
+        owner: root
+        group: root
+        mode: 0644
+      tags: update_db_conf
+
+    - name: Restart the database service
+      ansible.builtin.service:
+        name: mysql
+        state: restarted
+      tags: update_db_conf

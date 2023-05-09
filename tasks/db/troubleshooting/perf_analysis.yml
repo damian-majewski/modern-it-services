@@ -1,0 +1,32 @@
+---
+- name: Analyze performance issues
+  hosts: database_servers
+  tasks:
+    - name: Install monitoring tools
+      ansible.builtin.package:
+        name:
+          - htop
+          - iotop
+          - iftop
+        state: present
+
+    - name: Gather database configuration
+      ansible.builtin.shell: cat /path/to/database/config/file
+      register: db_config
+
+    - name: Save database configuration to a file
+      ansible.builtin.copy:
+        content: "{{ db_config.stdout }}"
+        dest: "/tmp/db_config.txt"
+
+    - name: Gather hardware resources information
+      ansible.builtin.setup:
+        gather_subset: hardware
+
+    - name: Save hardware resources information to a file
+      ansible.builtin.template:
+        src: hardware_info.j2
+        dest: "/tmp/hardware_info.txt"
+
+# hardware_info.j2
+{{ ansible_processor }} cores, {{ ansible_memtotal_mb }} MB RAM, {{ ansible_devices.sda.size }} disk size

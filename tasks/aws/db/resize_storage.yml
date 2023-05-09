@@ -1,0 +1,23 @@
+---
+- name: Increase the size of the database storage volume
+  hosts: database
+  tasks:
+    - name: Get the current volume size
+        command: aws ec2 describe-volumes --volume-ids "{{ volume_id }}"
+        register: current_volume  
+    - name: Calculate the new volume size
+      set_fact:
+        new_size: "{{ current_volume.json['Volumes'][0]['Size'] + size_increase }}"
+    
+    - name: Modify the volume size
+      command: aws ec2 modify-volume --volume-id "{{ volume_id }}" --size "{{ new_size }}"
+    
+    - name: Wait for the volume modification to complete
+      command: aws ec2 wait volume-modified --volume-ids "{{ volume_id }}"
+    
+    - name: Resize the file system
+      filesystem:
+        fstype: ext4
+        dev: /dev/xvdf
+        resizefs: yes
+    

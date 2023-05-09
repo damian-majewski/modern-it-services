@@ -1,0 +1,6 @@
+---
+- name: Set up read replicas for the database
+  hosts: localhost
+  tasks:
+    - name: Create read replica
+      command: aws rds create-db-instance-read-replica --db-instance-identifier "{{ read_replica_name }}" --source-db-instance-identifier "{{ source_db_name }}" --db-instance-class "{{ db_instance_class }}" --availability-zone "{{ availability_zone }}"

@@ -1,0 +1,65 @@
+---
+# ansible-playbook -i vmware.yml os_management/os_patching_satellite.yml
+- name: Patch VMs with Red Hat Satellite
+  hosts: all
+  become: yes
+  tasks:
+    - name: Register the system to Red Hat Satellite
+      redhat_subscription:
+        state: present
+        username: "{{ satellite_username }}"
+        password: "{{ satellite_password }}"
+        org_id: "{{ satellite_org_id }}"
+        activationkey: "{{ satellite_activation_key }}"
+      register: registration_result
+      ignore_errors: yes
+
+    - name: Check if registration was successful
+      fail:
+        msg: "System registration failed. Please check your Satellite credentials."
+      when: registration_result.failed
+
+    - name: Enable the necessary repositories
+      rhsm_repository:
+        name: "{{ item }}"
+        state: enabled
+      with_items:
+        - rhel-7-server-rpms
+        - rhel-7-server-extras-rpms
+        - rhel-7-server-optional-rpms
+        - rhel-7-server-satellite-tools-6.7-rpms
+
+    - name: Install katello-agent
+      package:
+        name: katello-agent
+        state: present
+
+    - name: Enable and start goferd service
+      systemd:
+        name: goferd
+        state: started
+        enabled: yes
+
+    - name: Refresh subscription manager
+      command: subscription-manager refresh
+
+    - name: Clean Yum cache
+      command: yum clean all
+
+    - name: Check for available updates
+      command: yum check-update
+      register: update_check
+      changed_when: False
+      ignore_errors: yes
+
+    - name: Apply updates if available
+      yum:
+        name: '*'
+        state: latest
+      when: update_check.rc == 100
+
+    - name: Reboot the system if needed
+      reboot:
+        post_reboot_delay: 30
+        reboot_timeout: 300
+      when: update_check.rc == 100

@@ -1,0 +1,6 @@
+---
+- name: Restore the database from a backup
+  hosts: localhost
+  tasks:
+    - name: Create a new database instance from the backup
+      command: aws rds restore-db-instance-from-db-snapshot --db-instance-identifier "{{ restored_db_name }}" --db-snapshot-identifier "{{ db_snapshot_id }}" --db-instance-class "{{ db_instance_class }}" --availability-zone "{{ availability_zone }}"

@@ -1,0 +1,22 @@
+---
+- name: Create an RDS snapshot
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Create RDS snapshot
+      amazon.aws.rds_snapshot:
+        region: us-west-2
+        instance_name: my_rds_instance
+        snapshot_name: my_rds_snapshot
+      tags: create_snap
+
+    - name: Restore RDS instance from snapshot
+      amazon.aws.rds_instance:
+        region: us-west-2
+        instance_name: restored_rds_instance
+        snapshot_name: my_rds_snapshot
+        instance_type: db.t2.micro
+        db_subnet_group_name: my_subnet_group
+        vpc_security_group_ids:
+          - sg-1234567890abcdef0
+      tags: restore_snap

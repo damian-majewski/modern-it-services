@@ -1,8 +1,8 @@
 ---
 - name: Deploy Kubernetes cluster on KVM
-  hosts: [kvm_hosts]
+  hosts: kvm_hosts
   become: true
-  
+
   vars:
     vm_name: kube-{{ item }}
     bridge_name: virbr1
@@ -18,7 +18,7 @@
     helm_version: 3.4.2
     nfs_server: 192.168.100.50
     nfs_path: /nfs
-  
+
   tasks:
     - name: Install bridge-utils package
       apt:
@@ -54,7 +54,7 @@
         serial: /dev/pts/0
         wait_for_cloud_init: true
       loop: "{{ range(3) | list }}"
- 
+
     - name: Wait for Kubernetes VMs to be ready
       wait_for:
         host: "{{ master_ip }}"
@@ -98,8 +98,9 @@
 
     - name: Initialize Kubernetes cluster
       command: kubeadm init --pod-network-cidr=10.244.0.0/16 --apiserver-advertise-address={{ master_ip }}
-      register: kubeadm_init
+      register: kub
       become: true
+      tags: master
 
     - name: Copy Kubernetes config file to user home directory
       become: true
@@ -107,11 +108,13 @@
         content: "{{ lookup('env', 'KUBECONFIG_CONTENT') }}"
         dest: "/home/{{ ansible_user_id }}/.kube/config"
         mode: "0600"
+      tags: master
 
     - name: Install CNI plugin
       shell: |
         curl -L https://github.com/containernetworking/plugins/releases/download/v{{ cni_version }}/cni-plugins-linux-amd64-v{{ cni_version }}.tgz | tar -xz -C /opt/cni/bin/
       become: true
+      tags: master
 
     - name: Install Calico network plugin
       shell: |
@@ -121,18 +124,21 @@
       become: true
       become_user: root
       when: kubeadm_init.stdout_lines[2] is search('kubeadm join')
+      tags: master
 
     - name: Install Helm
       shell: |
         curl https://get.helm.sh/helm-v{{ helm_version }}-linux-amd64.tar.gz | tar xz
         mv linux-amd64/helm /usr/local/bin/helm
       become: true
+      tags: master
 
     - name: Install NFS packages
       apt:
         name: nfs-kernel-server nfs-common
         state: latest
       become: true
+      tags: worker
 
     - name: Install NFS storage class
       command: |
@@ -155,19 +161,11 @@
         EOF
       become: false
       become_user: root
+      tags: worker
 
     - name: Add NFS storage class to default storage class
       shell: |
         kubectl patch storageclass standard -p '{"metadata": {"annotations":   {"storageclass.kubernetes.io/is-default-class":"true"}}}'
       register: nfs_storage_class
       become: false
-```
-This playbook assumes that you have already set up the necessary KVM infrastructure and have defined the inventory group `kvm_hosts` that includes the hosts on which the Kubernetes VMs will be deployed. Some variables are defined at the beginning of the playbook to customize the deployment to your environment.
-This playbook performs the following tasks:
-- Installs the bridge-utils package and creates a network bridge on the KVM hosts.
-- Deploys three Ubuntu VMs on the KVM hosts: one master node and two worker nodes. These VMs are connected to a virtual network that is bridged to the KVM host's physical network using the bridge created earlier.
-- Installs Docker and Kubernetes packages on the VMs.
-- Initializes a Kubernetes cluster on the master node.
-- Installs the Calico network plugin and the Helm package manager on the Kubernetes cluster.
-- Installs the NFS packages and creates an NFS storage class for dynamic provisioning of persistent volumes.
-This is just a sample playbook and may require customization to suit your specific environment and requirements.
+      tags: worker

@@ -1,0 +1,10 @@
+---
+- name: Delete an RDS instance
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Delete RDS instance
+      amazon.aws.rds_instance:
+        region: us-west-2
+        instance_name: my_rds_instance
+        state: absent
