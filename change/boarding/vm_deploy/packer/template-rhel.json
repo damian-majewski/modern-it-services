@@ -1,0 +1,37 @@
+{
+  "builders": [
+    {
+      "type": "vsphere-iso",
+      "vcenter_server":      "your.vcenter.server",
+      "username":            "your-username",
+      "password":            "your-password",
+      "insecure_connection": "true",
+      "cluster":             "your-cluster-name",
+      "datastore":           "your-datastore-name",
+      "network":             "your-network-name",
+      "datacenter":          "your-datacenter-name",
+      "vm_name":             "vm-name",
+      "guest_os_type":       "guest-os-type",
+      "CPUs":                "number-of-cpus",
+      "RAM":                 "ram-size",
+      "RAM_reserve_all":     "true/false",
+      "disk_controller_type":  "disk-controller-type",
+      "disk_size":            "disk-size",
+      "disk_thin_provisioned": "true/false",
+      "network_card":          "network-card-type",
+      "iso_paths": [
+        "[datastore-name] path/to/your.iso"
+      ],
+      "ssh_username": "root",
+      "ssh_password": "password",
+      "ssh_timeout": "30m",
+      "shutdown_command": "shutdown -P now",
+      "http_directory": "http",
+      "boot_command": [
+        "<tab><wait>",
+        "text ks=http://your.ks.file/location<enter><wait>"
+      ],
+      "convert_to_template": "true/false"
+    }
+  ]
+}

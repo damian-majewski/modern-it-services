@@ -1,0 +1,52 @@
+{
+  "builders": [{
+    "type": "vsphere-iso",
+    "vcenter_server":      "your.vcenter.server",
+    "username":            "your-username",
+    "password":            "your-password",
+    "insecure_connection": "true",
+    "cluster":             "your-cluster-name",
+    "datastore":           "your-datastore-name",
+    "network":             "your-network-name",
+    "datacenter":          "your-datacenter-name",
+    "vm_name":             "vm-name",
+    "guest_os_type":       "guest-os-type",
+    "CPUs":                "number-of-cpus",
+    "RAM":                 "ram-size",
+    "RAM_reserve_all":     "true/false",
+    "disk_controller_type":  "disk-controller-type",
+    "disk_size":            "disk-size",
+    "disk_thin_provisioned": "true/false",
+    "network_card":          "network-card-type",
+    "iso_paths": [
+      "[datastore-name] path/to/your.iso"
+    ],
+    "ssh_username": "ubuntu",
+    "ssh_password": "password",
+    "ssh_timeout": "30m",
+    "shutdown_command": "echo 'password' | sudo -S shutdown -P now",
+    "http_directory": "http",
+    "boot_command": [
+      "<enter><wait><f6><esc><wait>",
+      "<bs><bs><bs><bs><bs><bs><bs><bs><bs><bs><bs><bs><bs><bs><bs><bs><bs><bs><bs><bs>",
+      "/install/vmlinuz",
+      " auto",
+      " console-setup/ask_detect=false",
+      " console-setup/layoutcode=us",
+      " console-setup/modelcode=pc105",
+      " debconf/frontend=noninteractive",
+      " debian-installer=en_US",
+      " fb=false",
+      " kbd-chooser/method=us",
+      " keyboard-configuration/layout=USA",
+      " keyboard-configuration/variant=USA",
+      " locale=en_US",
+      " netcfg/get_domain=vm",
+      " netcfg/get_hostname=ubuntu",
+      " grub-installer/bootdev=/dev/sda",
+      " noapic",
+      " preseed/url=http://{{ .HTTPIP }}:{{ .HTTPPort }}/preseed.cfg",
+      " -- <enter>"
+    ]
+  }]
+}
